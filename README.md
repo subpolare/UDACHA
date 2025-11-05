@@ -12,4 +12,4 @@ pip install mixalime
 conda install bioconda::plink2
 ```
 
-Than install [bcftools and tabix](https://www.htslib.org/download/) according to the instructions from the developers.
+Than install [bcftools](https://www.htslib.org/download/) according to the instructions from the developers.
