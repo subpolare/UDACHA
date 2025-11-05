@@ -1,6 +1,15 @@
-# Last updated 13 Feb 2025
 home='/home/subpolare/adastra-v7'
 threads=10
+
+# DO NOT EDIT BELOW
+
+mkdir -p tmp/ VCFs/ BEDs/ BADs/ SNPs/ SNPScan/ mixalime/
+if [ ! -d hocomoco/v13/pwm ]; then
+    set -euo pipefail
+    mkdir -p hocomoco/v13/pwm
+    curl -fsSL "https://hocomoco13.autosome.org/final_bundle/hocomoco13/H13RSNP/H13RSNP_pwm.tar.gz" \
+        | tar -xz -C hocomoco/v13/pwm --strip-components=2
+fi
 
 # 1. Merging files
 
@@ -27,13 +36,13 @@ while IFS= read -r f; do
     printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/tmp/samples.meta.tsv
 done < ${home}/tmp/vcfs.list
 
-bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.vcf.gz -l ${home}/tmp/vcfs.list
+bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/tmp/vcfs.list
 
 # If there is an duplicate error, use command below to find it: 
 # for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
 # than you need to remove duplicates 
 
-bcftools index -f merged.vcf.gz
+bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz
 
 
 
