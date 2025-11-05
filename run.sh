@@ -44,7 +44,12 @@ bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF
 
 bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz
 
+# 2. Clusterization 
 
+plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz 'dosage=GT' \
+  --allow-extra-chr --vcf-half-call missing \
+  --const-fid --double-id --make-king square gz \
+  --out ${home}/tmp/king_all
 
 
 
