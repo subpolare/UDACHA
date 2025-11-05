@@ -1,19 +1,20 @@
-home='/home/subpolare/adastra-v7'
-threads=10
+home='/sandbox/subpolare/adastra'
+scripts='/home/subpolare/adastra-v7/scripts'
+threads=50
 
 # DO NOT EDIT BELOW
 
-mkdir -p tmp/ VCFs/ BEDs/ BADs/ SNPs/ SNPScan/ mixalime/
-if [ ! -d hocomoco/v13/pwm ]; then
+mkdir -p ${home}/tmp/ ${home}/VCFs/ ${home}/BEDs/ ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/
+if [ ! -d ${home}/hocomoco/v13/pwm ]; then
     set -euo pipefail
-    mkdir -p hocomoco/v13/pwm
+    mkdir -p ${home}/hocomoco/v13/pwm
     curl -fsSL "https://hocomoco13.autosome.org/final_bundle/hocomoco13/H13RSNP/H13RSNP_pwm.tar.gz" \
-        | tar -xz -C hocomoco/v13/pwm --strip-components=2
+        | tar -xz -C ${home}/hocomoco/v13/pwm --strip-components=2
 fi
 
 # 1. Merging files
 
-python3 ${home}/scripts/renamer.py 
+python3 ${scripts}/renamer.py 
 for file in ${home}/VCFs/*.vcf.gz; do
     bcftools index -f $file
 done
@@ -40,7 +41,7 @@ bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF
 
 # If there is an duplicate error, use command below to find duplicates: 
 # for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
-# of all the duplicates, only one should be left
+# of all the duplicates, only one should be left  
 
 bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz
 
@@ -50,6 +51,10 @@ plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz 'dosage=GT' \
   --allow-extra-chr --vcf-half-call missing \
   --const-fid --double-id --make-king square gz \
   --out ${home}/tmp/king_all
+
+
+
+
 
 
 
