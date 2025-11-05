@@ -22,4 +22,10 @@ conda install bioconda::plink2
 
 3. Copy resulting `.vcf.gz` files from the [updated ADASTRA workflow](https://github.com/subpolare/ADASTRA) to the `VCFs/`.
 
-4. Run `run.sh` with your `$home` (workdir) and `$threads` in the beginning of the file. 
+4. Update following variables in the beginning of the `run.sh`:
+
+  - home: working directory 
+  - scripts: full path to the [scripts directory](https://github.com/subpolare/UDACHA/tree/main/scripts)
+  - threads: number of threads 
+
+6. Run `run.sh`
