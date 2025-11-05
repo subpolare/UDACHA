@@ -38,9 +38,9 @@ done < ${home}/tmp/vcfs.list
 
 bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/tmp/vcfs.list
 
-# If there is an duplicate error, use command below to find it: 
+# If there is an duplicate error, use command below to find duplicates: 
 # for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
-# than you need to remove duplicates 
+# of all the duplicates, only one should be left
 
 bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz
 
