@@ -1,4 +1,5 @@
 # You need to create all these directories 
+tmp/
 BADs/
 BEDs/
 hocomoco/

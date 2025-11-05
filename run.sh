@@ -9,6 +9,17 @@ for file in ${home}/VCFs/*.vcf.gz; do
     bcftools index -f $file
 done
 
+find ${home}/VCFs -type f -name "*.vcf.gz" | sort > ${home}/tmp/vcfs.list
+
+echo -e "sample_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/tmp/samples.meta.tsv
+while IFS= read -r f; do
+  b=$(basename "$f")
+  base=${b%.vcf.gz}
+  IFS=_ read -r tf cell fileid gse <<< "$base"
+  sid=$(bcftools query -l "$f")
+  printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/tmp/samples.meta.tsv
+done < ${home}/tmp/vcfs.list
+
 # 2. BABACHI, https://github.com/autosome-ru/BABACHI 
 
 run_babachi() { 
