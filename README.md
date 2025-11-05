@@ -13,3 +13,16 @@ conda install bioconda::plink2
 ```
 
 Than install [bcftools](https://www.htslib.org/download/) according to the instructions from the developers.
+
+Than ypu need to create following directories: 
+
+```
+tmp/
+VCFs/
+BEDs/
+BADs/
+SNPs/
+SNPScan/
+mixalime/
+hocomoco/v12/
+```
