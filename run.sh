@@ -20,6 +20,10 @@ while IFS= read -r f; do
   printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/tmp/samples.meta.tsv
 done < ${home}/tmp/vcfs.list
 
+
+
+# NOT UPDATED || OLD VERSION
+
 # 2. BABACHI, https://github.com/autosome-ru/BABACHI 
 
 run_babachi() { 
