@@ -24,8 +24,8 @@ conda install bioconda::plink2
 
 4. Update following variables in the beginning of the `run.sh`:
 
-  - home: working directory 
+  - home: full path to the working directory
   - scripts: full path to the [scripts directory](https://github.com/subpolare/UDACHA/tree/main/scripts)
-  - threads: number of threads 
+  - threads: number of worker threads 
 
 6. Run `run.sh`
