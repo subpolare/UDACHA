@@ -6,7 +6,7 @@ Continuation of the [updated ADASTRA workflow](https://github.com/subpolare/ADAS
 
 The code takes as input GATK/bcftools-derived per-sample bgzipped, tabix-indexed VCFs of heterozygous SNVs (with GT/AD and coverage filters, aligned to GRCh38/dbSNP151) and outputs an [updated ADASTRA database](https://adastra.autosome.org/mabel) with recomputed genotype clusters, BAD maps, and allele-specific variant calls.
 
-![python](https://img.shields.io/badge/python%20-%234584B6.svg?&style=for-the-badge&logo=python&logoColor=white) ![shell](https://img.shields.io/badge/shell-%234EAA25.svg?&style=for-the-badge&logo=gnu-bash&logoColor=white)
+![python](https://img.shields.io/badge/python%20-%234584B6.svg?&style=for-the-badge&logo=python&logoColor=white) ![pandas](https://img.shields.io/badge/pandas%20-%23150458.svg?&style=for-the-badge&logo=pandas&logoColor=white) ![numpy](https://img.shields.io/badge/numpy-%23013243.svg?&style=for-the-badge&logo=numpy&logoColor=white) ![shell](https://img.shields.io/badge/shell-%234EAA25.svg?&style=for-the-badge&logo=gnu-bash&logoColor=white)
 
 ## 🌊 How to run 
 
