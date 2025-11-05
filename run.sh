@@ -2,23 +2,46 @@
 home='/home/subpolare/adastra-v7'
 threads=10
 
-# 1. Preparing files
+# 1. Merging files
 
 python3 ${home}/scripts/renamer.py 
 for file in ${home}/VCFs/*.vcf.gz; do
     bcftools index -f $file
 done
 
-find ${home}/VCFs -type f -name "*.vcf.gz" | sort > ${home}/tmp/vcfs.list
+find ${home}/VCFs -maxdepth 1 -type f -name "*.vcf.gz" ! -name "*.without_MAF.vcf.gz" -print0 |
+    while IFS= read -r -d '' f; do
+        out="${f%.vcf.gz}.without_MAF.vcf.gz"
+        bcftools annotate -x INFO/MAF -Oz -o "$out" "$f"
+        bcftools index -f "$out"
+    done
+
+find ${home}/VCFs -type f -name "*.without_MAF.vcf.gz" | sort > ${home}/tmp/vcfs.list
 
 echo -e "sample_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/tmp/samples.meta.tsv
 while IFS= read -r f; do
-  b=$(basename "$f")
-  base=${b%.vcf.gz}
-  IFS=_ read -r tf cell fileid gse <<< "$base"
-  sid=$(bcftools query -l "$f")
-  printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/tmp/samples.meta.tsv
+    b=$(basename "$f")
+    base=${b%.vcf.gz}
+    IFS=_ read -r tf cell fileid gse <<< "$base"
+    sid=$(bcftools query -l "$f")
+    printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/tmp/samples.meta.tsv
 done < ${home}/tmp/vcfs.list
+
+bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.vcf.gz -l ${home}/tmp/vcfs.list
+
+# If there is an duplicate error, use command below to find it: 
+# for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
+# than you need to remove duplicates 
+
+bcftools index -f merged.vcf.gz
+
+
+
+
+
+
+
+
 
 
 
