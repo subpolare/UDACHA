@@ -47,11 +47,9 @@ bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
 
 # 2. Clusterization 
 
-plink2 \
-  --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
-  --allow-extra-chr \
+plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
+  --allow-extra-chr --threads $threads --double-id \
   --vcf-half-call missing \
-  --double-id \
   --make-king square \
   --out ${home}/tmp/king_all
 
