@@ -53,6 +53,11 @@ plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --make-king square \
   --out ${home}/tmp/king_all
 
+plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
+  --allow-extra-chr --vcf-half-call missing \
+  --export A --out ${home}/tmp/geno
+
+
 
 
 
