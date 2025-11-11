@@ -43,7 +43,7 @@ bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF
 # for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
 # of all the duplicates, only one should be left  
 
-bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz
+bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
 
 # 2. Clusterization 
 
