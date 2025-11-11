@@ -47,9 +47,12 @@ bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz
 
 # 2. Clusterization 
 
-plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz 'dosage=GT' \
-  --allow-extra-chr --vcf-half-call missing \
-  --const-fid --double-id --make-king square gz \
+plink2 \
+  --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
+  --allow-extra-chr \
+  --vcf-half-call missing \
+  --double-id \
+  --make-king square gz \
   --out ${home}/tmp/king_all
 
 
