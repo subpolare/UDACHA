@@ -52,7 +52,7 @@ plink2 \
   --allow-extra-chr \
   --vcf-half-call missing \
   --double-id \
-  --make-king square gz \
+  --make-king square \
   --out ${home}/tmp/king_all
 
 
