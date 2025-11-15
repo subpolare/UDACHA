@@ -66,11 +66,12 @@ plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
 
 # LD-prune variants (MAF ≥ 1%, missingness ≤ 10%, window 500 kb / step 50 kb, r^2 > 0.2) and write lists of SNPs
 plink2 --pfile ${home}/tmp/p \
-  --maf 0.01 --geno 0.10 \
+  --snps-only just-acgt --maf 0.01 \
   --indep-pairwise 500 50 0.2 \
   --out ${home}/tmp/prune --threads $threads
 
 # Subset to the pruned SNP set and write a compact pgen restricted to near-independent markers.
+# Не работает :( Всё снеслось 
 plink2 --pfile ${home}/tmp/p \
   --extract ${home}/tmp/prune.prune.in \
   --make-pgen --out ${home}/tmp/p.pruned --threads $threads
