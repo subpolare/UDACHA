@@ -34,9 +34,15 @@ def main():
     print(f'✅ [3/5] Zero KING distances < {args.dist0}')
 
     corr_dist = pdist(K, metric = 'correlation')
+    bad = ~np.isfinite(corr_dist)
+    n_bad = int(bad.sum())
+    if n_bad > 0:
+        print(f'⚠️ Non-finite distances detected: {n_bad}, set to 1.0')
+        corr_dist[bad] = 1.0
+    print('✅ [4/5] Compute cleaned correlation distances and run clustering')
+
     Z = linkage(corr_dist, method = 'complete')
     labels = fcluster(Z, t = args.cut, criterion = 'distance')
-    print(f'✅ [4/5] Perform hierarchical clustering with cut {args.cut}')
 
     out = pd.DataFrame({'sample_id' : sample_id, 'geno_cluster_id' : labels.astype(int)})
     out.to_csv(args.output, sep = '\t', index = False)
