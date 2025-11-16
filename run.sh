@@ -47,44 +47,19 @@ bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
 
 # 2. Clusterization, https://doi.org/10.1186/s13742-015-0047-8 
 
-# Compute a square KING kinship/distance matrix between all samples from the multi-sample VCF
 plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --allow-extra-chr --threads $threads --double-id \
   --vcf-half-call missing \
   --make-king square \
   --out ${home}/tmp/king_all
+cut -f2 ${home}/tmp/king_all.king.id > ${home}/tmp/king.samples
 
-# Export the full additive genotype matrix (samples × variants) from the VCF — huge file; mainly for reference/QC, not used after pruning
-plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
-  --allow-extra-chr --vcf-half-call missing \
-  --export A --out ${home}/tmp/geno
-
-# Convert the VCF into PLINK2’s fast pgen format to enable efficient filtering and LD-pruning downstream.
-plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
-  --allow-extra-chr --vcf-half-call missing --double-id \
-  --make-pgen --out ${home}/tmp/p --threads $threads
-
-# LD-prune variants (MAF ≥ 1%, missingness ≤ 10%, window 500 kb / step 50 kb, r^2 > 0.2) and write lists of SNPs
-plink2 --pfile ${home}/tmp/p \
-  --snps-only just-acgt --maf 0.01 \
-  --indep-pairwise 500 50 0.2 \
-  --out ${home}/tmp/prune --threads $threads
-
-# Subset to the pruned SNP set and write a compact pgen restricted to near-independent markers.
-# Не работает :( Всё снеслось 
-plink2 --pfile ${home}/tmp/p \
-  --extract ${home}/tmp/prune.prune.in \
-  --make-pgen --out ${home}/tmp/p.pruned --threads $threads
-
-# Randomly thin to ~100k SNP from the pruned set and export a lightweight additive matrix for correlation-based clustering
-plink2 --pfile ${home}/tmp/p.pruned \
-  --thin-count 100000 \
-  --export A --out ${home}/tmp/geno.pruned --threads $threads
-
-# Correlation-based, complete-linkage genotype clustering (zero distances <0.4; cut at 0.1).
-python3 clusterization.py \
-  --geno   ${home}/tmp/geno.pruned.raw \
-  --output ${home}/tmp/genotype_clusters.tsv
+python3 ${scripts}/clusterization.py \
+  --king     ${home}/tmp/king_all.king \
+  --king-id  ${home}/tmp/king_all.king.id \
+  --output   ${home}/tmp/geno_clusters.tsv \
+  --dist0    0.4 \
+  --cut      0.1
 
 # 3. BABACHI, https://github.com/autosome-ru/BABACHI 
 
