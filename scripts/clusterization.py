@@ -2,51 +2,56 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, squareform
 from scipy.cluster.hierarchy import linkage, fcluster
 
 def main():
-    ap = argparse.ArgumentParser(description = 'Genotype-based clustering from KING matrix (complete-linkage, correlation metric)')
-    ap.add_argument('--king',    required = True, help = 'PLINK2 --make-king square output (.king)')
-    ap.add_argument('--king-id', required = True, help = 'Sample IDs for KING matrix (.king.id)')
+    ap = argparse.ArgumentParser(description = 'Genotype-based clustering from PLINK --export A (complete-linkage, correlation metric)')
+    ap.add_argument('--geno',    required = True, help = 'PLINK --export A .raw file')
     ap.add_argument('--output',  required = True, help = 'Output TSV: sample_id\tgeno_cluster_id')
-    ap.add_argument('--dist0',   type = float, default = 0.4, help = 'Threshold on inter-sample KING distances to be zeroed')
     ap.add_argument('--cut',     type = float, default = 0.1, help = 'Dendrogram cut height in correlation distance')
     args = ap.parse_args()
 
-    K = np.loadtxt(args.king, dtype = np.float32)
-    n_k = K.shape[0]
-    print(f'✅ [1/5] Load KING matrix with shape {K.shape}')
+    X = pd.read_csv(args.geno, sep = r'\s+', engine = 'python')
+    print(f'✅ [1/6] Load PLINK raw with shape {X.shape}')
 
-    ids = pd.read_csv(args.king_id, sep = r'\s+', engine = 'python')
-    if ids.shape[0] == n_k + 1:
-        ids = ids.iloc[1:, :]
-    if ids.shape[0] != n_k:
-        raise ValueError(f'KING ID count {ids.shape[0]} != {n_k} rows in {args.king}')
-    if ids.shape[1] == 1:
-        sample_id = ids.iloc[:, 0].astype(str).values
-    else:
-        sample_id = ids.iloc[:, 1].astype(str).values
-    print(f'✅ [2/5] Load {len(sample_id)} sample IDs')
+    if 'IID' not in X.columns:
+        raise ValueError('IID column not found in PLINK raw file')
+    sample_id = X['IID'].astype(str).values
+    G = X.iloc[:, 6:].replace(-9, np.nan).astype('float32')
+    print(f'✅ [2/6] Extract genotype matrix with shape {G.shape}')
 
-    np.fill_diagonal(K, 0.0)
-    K[K < args.dist0] = 0.0
-    print(f'✅ [3/5] Zero KING distances < {args.dist0}')
+    nan_frac = G.isna().mean(axis = 1).values
+    mask = nan_frac < 1.0
+    dropped = (~mask).sum()
+    if dropped > 0:
+        print(f'⚠️  Drop {dropped} samples with all NaN genotypes')
+    G = G.loc[mask].copy()
+    sample_id_clust = sample_id[mask]
+    print(f'✅ [3/6] Keep {G.shape[0]} samples for clustering')
 
-    corr_dist = pdist(K, metric = 'correlation')
-    bad = ~np.isfinite(corr_dist)
-    n_bad = int(bad.sum())
-    if n_bad > 0:
-        print(f'⚠️ Non-finite distances detected: {n_bad}, set to 1.0')
-        corr_dist[bad] = 1.0
-    print('✅ [4/5] Compute cleaned correlation distances and run clustering')
+    col_mean = G.mean(axis = 0)
+    G = G.fillna(col_mean)
+    std = G.std(axis = 0).replace(0, 1.0)
+    G = (G - col_mean) / std
+    print('✅ [4/6] Standardize genotypes')
 
-    Z = linkage(corr_dist, method = 'complete')
-    labels = fcluster(Z, t = args.cut, criterion = 'distance')
+    D = squareform(pdist(G.values, metric = 'correlation'))
+    Z = linkage(squareform(D, checks = False), method = 'complete')
+    labels_clust = fcluster(Z, t = args.cut, criterion = 'distance')
+    print(f'✅ [5/6] Perform hierarchical clustering with cut {args.cut}')
+
+    labels = np.zeros(sample_id.shape[0], dtype = int)
+    labels[mask] = labels_clust
+    if dropped > 0:
+        max_lab = labels_clust.max()
+        idx = np.where(~mask)[0]
+        labels[idx] = np.arange(max_lab + 1, max_lab + 1 + dropped)
+        print(f'⚠️  Assign unique cluster IDs to {dropped} samples with all-missing genotypes')
 
     out = pd.DataFrame({'sample_id' : sample_id, 'geno_cluster_id' : labels.astype(int)})
     out.to_csv(args.output, sep = '\t', index = False)
-    print(f'✅ [5/5] Save clusters to {args.output}')
+    print(f'✅ [6/6] Save clusters to {args.output}')
 
 if __name__ == '__main__':
     main()
