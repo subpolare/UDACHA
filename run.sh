@@ -47,21 +47,12 @@ bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
 
 # 2. Clusterization, https://doi.org/10.1186/s13742-015-0047-8 
 
-plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
-  --allow-extra-chr --threads $threads --double-id \
-  --vcf-half-call missing \
-  --make-king square \
-  --out ${home}/tmp/king_all
-cut -f2 ${home}/tmp/king_all.king.id > ${home}/tmp/king.samples
-
-python3 ${scripts}/clusterization.py \
-  --king     ${home}/tmp/king_all.king \
-  --king-id  ${home}/tmp/king_all.king.id \
-  --output   ${home}/tmp/geno_clusters.tsv \
-  --dist0    0.4 \
-  --cut      0.1
-
-# now I'm trying 
+# plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
+#   --allow-extra-chr --threads $threads --double-id \
+#   --vcf-half-call missing \
+#   --make-king square \
+#   --out ${home}/tmp/king_all
+# cut -f2 ${home}/tmp/king_all.king.id > ${home}/tmp/king.samples
 
 plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --allow-extra-chr \
@@ -72,6 +63,24 @@ plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --make-pgen \
   --out ${home}/tmp/p \
   --threads ${threads}
+
+plink2 --pfile ${home}/tmp/p \
+  --allow-extra-chr \
+  --snps-only just-acgt --max-alleles 2 \
+  --maf 0.01 \
+  --geno 0.99 \
+  --thin-count 100000 \
+  --export A \
+  --out ${home}/tmp/geno_sampled \
+  --threads ${threads}
+
+python3 ${scripts}/clusterization.py \
+  --king     ${home}/tmp/king_all.king \
+  --king-id  ${home}/tmp/king_all.king.id \
+  --output   ${home}/tmp/geno_clusters.tsv \
+  --dist0    0.4 \
+  --cut      0.1
+
 
 # 3. BABACHI, https://github.com/autosome-ru/BABACHI 
 
