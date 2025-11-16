@@ -61,6 +61,18 @@ python3 ${scripts}/clusterization.py \
   --dist0    0.4 \
   --cut      0.1
 
+# now I'm trying 
+
+plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
+  --allow-extra-chr \
+  --double-id \
+  --vcf-half-call missing \
+  --snps-only just-acgt \
+  --max-alleles 2 \
+  --make-pgen \
+  --out ${home}/tmp/p \
+  --threads ${threads}
+
 # 3. BABACHI, https://github.com/autosome-ru/BABACHI 
 
 
