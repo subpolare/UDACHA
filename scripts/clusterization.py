@@ -1,29 +1,43 @@
+import argparse
 import numpy as np
 import pandas as pd
-import os, sys, argaprs
-from scipy.spatial.distance import pdist, squareform
+
+from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import linkage, fcluster
 
+def load_sample_ids(king_id_path: str) -> np.ndarray:
+    ids = pd.read_csv(king_id_path, sep = r"\s+", header = None, engine = "python")
+    if ids.shape[1] == 1:
+        sid = ids.iloc[:, 0].astype(str).values
+    else:
+        sid = ids.iloc[:, 1].astype(str).values
+    return sid
+
 def main():
-    ap = argparse.ArgumentParser(description = 'Genotype-based clustering (complete-linkage, correlation)')
-    ap.add_argument("--geno",   required = True, help = 'PLINK --export A file (geno.raw)')
-    ap.add_argument("--output", required = True, help = 'Output TSV: sample_id\tgeno_cluster_id')
+    ap = argparse.ArgumentParser(description = "Genotype-based clustering from KING matrix (complete-linkage, correlation metric)")
+    ap.add_argument("--king",    required = True, help = "PLINK2 --make-king square output (.king)")
+    ap.add_argument("--king-id", required = True, help = "Sample IDs for KING matrix (.king.id)")
+    ap.add_argument("--output",  required = True, help = "Output TSV: sample_id\\tgeno_cluster_id")
+    ap.add_argument("--dist0",   type = float, default = 0.4, help = "Threshold on inter-sample KING distances to be zeroed")
+    ap.add_argument("--cut",     type = float, default = 0.1, help = "Dendrogram cut height in correlation distance")
     args = ap.parse_args()
 
-    X = pd.read_csv(args.geno, sep = r'\s+', engine = 'python')
-    sid = X['IID']
-    G = X.iloc[:,6:].replace(-9, np.nan).astype('float32')
-    col_mean = G.mean(axis = 0); G = G.fillna(col_mean)
-    std = G.std(axis = 0).replace(0, 1.0)
-    G = (G - col_mean) / std
+    sample_id = load_sample_ids(args.king_id)
+    n = len(sample_id)
 
-    D = squareform(pdist(G.values, metric = 'correlation'))
-    D[D < 0.4] = 0.0
-    Z = linkage(squareform(D, checks=False), method = 'complete')
-    labels = fcluster(Z, t=0.1, criterion = 'distance')
+    K = np.loadtxt(args.king, dtype = np.float32)
+    if K.shape != (n, n):
+        raise ValueError(f"KING matrix shape {K.shape} != ({n}, {n}) from {args.king_id}")
 
-    out = pd.DataFrame({'sample_id' : sample_id, 'geno_cluster_id' : labels})
-    out.to_csv(args.output, sep = '\t', index = False)
+    np.fill_diagonal(K, 0.0)
+    K[K < args.dist0] = 0.0
+
+    corr_dist = pdist(K, metric = "correlation")
+    Z = linkage(corr_dist, method = "complete")
+    labels = fcluster(Z, t = args.cut, criterion = "distance")
+
+    out = pd.DataFrame({"sample_id" : sample_id, "geno_cluster_id" : labels.astype(int)})
+    out.to_csv(args.output, sep = "\t", index = False)
 
 if __name__ == "__main__":
     main()
