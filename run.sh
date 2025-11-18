@@ -93,7 +93,7 @@ run_babachi() {
 }
 
 export -f run_babachi
-find ${home}/BEDs -name *.bed | parallel -j $threads run_babachi {}
+find ${home}/BEDs -name *.bed | parallel -j 10 run_babachi {}
 
 
 
