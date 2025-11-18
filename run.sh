@@ -51,7 +51,7 @@ plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --make-king square \
   --out ${home}/clustering/king_all
 
-python3 clustering_script.py \
+python3 clustering.py \
   --matrix     ${home}/clustering/king_all.king \
   --matrix-ids ${home}/clustering/king_all.king.id \
   --meta-file  ${home}/tmp/samples.meta.tsv \
