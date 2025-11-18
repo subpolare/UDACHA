@@ -14,7 +14,7 @@ fi
 
 # 1. Merging files & Clustering
 
-python3 ${scripts}/renamer.py 
+python3 ${scripts}/clustering/renamer.py 
 for file in ${home}/VCFs/*.vcf.gz; do
     bcftools index -f $file
 done
@@ -49,13 +49,13 @@ plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --make-king square \
   --out ${home}/clustering/king_all
 
-python3 ${scripts}/clustering.py \
+python3 ${scripts}/clustering/clustering.py \
   --matrix     ${home}/clustering/king_all.king \
   --matrix-ids ${home}/clustering/king_all.king.id \
   --meta-file  ${home}/tmp/samples.meta.tsv \
   --outpath    ${home}/clustering
 
-python3 ${scripts}/create_bed_clusters.py \
+python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
   --work     ${home}
 
@@ -64,15 +64,16 @@ python3 ${scripts}/create_bed_clusters.py \
 run_babachi() { 
     file=$1
     home=$2
+    scripts=$3
     name=$(basename $file .vcf.gz)
     
     babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/ 
     find ${home}/BADs -type f -exec sh -c 'for f in "$@"; do if [ "$(wc -l < "$f")" -eq 1 ]; then rm "$f"; fi; done' sh {} +
     babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
-    python3 ${home}/scripts/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
+    python3 ${scripts}/babachi/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
     
     if [ -e "${home}/BADs/${name}.badmap.bed" ]; then
-        python3 ${home}/scripts/add_bad_to_bed.py \
+        python3 ${scripts}/babachi/add_bad_to_bed.py \
             --bed    ${home}/BEDs/${name}.bed \
             --bad    ${home}/BADs/${name}.badmap.bed \
             --output ${home}/BEDs/${name}.with_bad.bed
@@ -82,7 +83,7 @@ run_babachi() {
 }
 
 export -f run_babachi
-find ${home}/BEDs -name *.bed | parallel -j $threads run_babachi {} $home
+find ${home}/BEDs -name *.bed | parallel -j $threads run_babachi {} $home $scripts 
 
 
 
@@ -124,7 +125,7 @@ done
 
 for model in MCNB NB BetaNB; do
     for TF in $(echo "$TFs" | sort -u); do 
-        python3 ${home}/scripts/create_tf_tables.py \
+        python3 ${scripts}/create_tf_tables.py \
             --mixalime ${home}/mixalime/results_${model}/pvalues/${TF}.tsv \
             --bed "${home}/BEDs/${TF}*.with_bad.bed" \
             --output ${home}/new-version/TF/${TF}_HUMAN_${model}.tsv
@@ -135,7 +136,7 @@ done
 
 for file in $(ls -1 ${home}/new-version/TF/*); do
     TF=$(basename $file | cut -f1 -d '.' | cut -f1 -d '_')
-    python3 scripts/make_snps_list.py \
+    python3 ${scripts}/make_snps_list.py \
         --genome '/home/subpolare/genome/GRCh38.primary_assembly.genome.fa' \
         --threads 20 \
         --input ${home}/new-version/TF/${TF}_HUMAN.tsv \
