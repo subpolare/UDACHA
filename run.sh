@@ -8,7 +8,7 @@ export home
 export scripts 
 export threads
 
-mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/
+mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/ ${home}/mixalime/groups/
 if [ ! -d ${home}/hocomoco/v13/pwm ]; then
     set -euo pipefail
     mkdir -p ${home}/hocomoco/v13/pwm
@@ -97,15 +97,46 @@ find ${home}/BEDs -name *.bed | parallel -j 10 run_babachi {}
 
 # 3. MixALiMe for TFs, http://mixalime.georgy.top/tutorial/quickstart.html
 
+cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/factors.list
+while read tf; do
+    awk -F'\t' -v tf="$tf" 'NR > 1 && $2 == tf { print $7 }' ${home}/clustering/metadata.clustered.tsv \
+        | sort -u \
+        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
+        > ${home}/mixalime/groups/factors_"$tf".list
+done < ${home}/mixalime/groups/factors.list
+
+cut -f3 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/cell.list
+while read cell; do
+    awk -F'\t' -v cell="$cell" 'NR > 1 && $3 == cell { print $7 }' ${home}/clustering/metadata.clustered.tsv \
+        | sort -u \
+        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
+        > ${home}/mixalime/groups/cell_${cell}.list
+done < ${home}/mixalime/groups/cell.list
+
 for model in MCNB NB BetaNB; do
-    mixalime create ${home}/mixalime/${model} ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
-    mixalime fit ${home}/mixalime/${model} $model
-    mixalime test ${home}/mixalime/${model}
-    
+    project=${home}/mixalime/${model}
+
+    mixalime create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
+    mixalime fit $project $model
+    mixalime test $project
+
+    while read tf; do
+        mixalime combine \
+            --subname "TF_${tf}" \
+            --group ${home}/mixalime/groups/factors_${tf}.list \
+            $project
+    done < ${home}/mixalime/groups/factors.list
+
+    while read cell; do
+        mixalime combine \
+            --subname "CELL_${cell}" \
+            --group ${home}/mixalime/groups/cell_${cell}.list \
+            $project
+    done < ${home}/mixalime/groups/cell.list
+
+    mixalime export all $project ${home}/mixalime/results_${model}
+    mixalime plot all $project ${home}/mixalime/results_${model}
 done
-
-
-
 
 
 
@@ -117,25 +148,6 @@ done
 
 
 # NOT UPDATED || OLD VERSION
-
-# 3. MixALiMe for TFs, http://mixalime.georgy.top/tutorial/quickstart.html
-
-for model in MCNB NB BetaNB; do
-    mixalime create ${home}/mixalime/${model} ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
-    mixalime fit ${home}/mixalime/${model} $model
-    mixalime test ${home}/mixalime/${model}
-
-    TFs=$(for file in ${home}/BEDs/*.with_bad.bed; do
-        basename "$file" | cut -d'_' -f1
-    done)
-
-    for TF in $(echo "$TFs" | sort -u); do
-        mixalime combine ${home}/mixalime/${model} --group "m:${home}/BEDs/${TF}_*.with_bad.bed" --subname $TF
-    done
-
-    mixalime export all ${home}/mixalime/${model} ${home}/mixalime/results_${model}
-    mixalime plot all ${home}/mixalime/${model} ${home}/mixalime/results_${model}
-done
 
 # 4. Creating tables for TFs
 
