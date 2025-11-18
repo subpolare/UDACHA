@@ -63,8 +63,6 @@ python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
   --work     ${home}
 
-for 
-
 find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
   for f do
     if [ "$(wc -l < "$f")" -eq 1 ]; then
