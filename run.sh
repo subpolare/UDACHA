@@ -63,11 +63,19 @@ python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
   --work     ${home}
 
+find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
+  for f do
+    if [ "$(wc -l < "$f")" -eq 1 ]; then
+      rm "$f"
+    fi
+  done
+' sh {} +
+
 # 2. BABACHI, https://github.com/autosome-ru/BABACHI 
 
 run_babachi() { 
     file=$1
-    name=$(basename $file .vcf.gz)
+    name=$(basename $file .bed)
     
     babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/ 
     find ${home}/BADs -type f -exec sh -c 'for f in "$@"; do if [ "$(wc -l < "$f")" -eq 1 ]; then rm "$f"; fi; done' sh {} +
