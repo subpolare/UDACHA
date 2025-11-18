@@ -4,6 +4,10 @@ threads=50
 
 # DO NOT EDIT BELOW
 
+export home 
+export scripts 
+export threads
+
 mkdir -p ${home}/tmp/ ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/
 if [ ! -d ${home}/hocomoco/v13/pwm ]; then
     set -euo pipefail
@@ -63,8 +67,6 @@ python3 ${scripts}/clustering/create_bed_clusters.py \
 
 run_babachi() { 
     file=$1
-    home=$2
-    scripts=$3
     name=$(basename $file .vcf.gz)
     
     babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/ 
@@ -83,7 +85,7 @@ run_babachi() {
 }
 
 export -f run_babachi
-find ${home}/BEDs -name *.bed | parallel -j $threads run_babachi {} $home $scripts 
+find ${home}/BEDs -name *.bed | parallel -j $threads run_babachi {}
 
 
 
