@@ -8,7 +8,7 @@ export home
 export scripts 
 export threads
 
-mkdir -p ${home}/tmp/ ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/
+mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/
 if [ ! -d ${home}/hocomoco/v13/pwm ]; then
     set -euo pipefail
     mkdir -p ${home}/hocomoco/v13/pwm
@@ -30,17 +30,17 @@ find ${home}/VCFs -maxdepth 1 -type f -name "*.vcf.gz" ! -name "*.without_MAF.vc
         bcftools index -f "$out"
     done
 
-find ${home}/VCFs -type f -name "*.without_MAF.vcf.gz" | sort > ${home}/tmp/vcfs.list
-echo -e "indiv_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/tmp/samples.meta.tsv
+find ${home}/VCFs -type f -name "*.without_MAF.vcf.gz" | sort > ${home}/clustering/vcfs.list
+echo -e "indiv_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/clustering/samples.meta.tsv
 while IFS= read -r f; do
     b=$(basename "$f")
     base=${b%.vcf.gz}
     IFS=_ read -r tf cell fileid gse <<< "$base"
     sid=$(bcftools query -l "$f")
-    printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/tmp/samples.meta.tsv
-done < ${home}/tmp/vcfs.list
+    printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/clustering/samples.meta.tsv
+done < ${home}/clustering/vcfs.list
 
-bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/tmp/vcfs.list 
+bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/clustering/vcfs.list 
 bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
 
 # If there is an duplicate error in bcftools merge, use command below to find duplicates: 
@@ -56,12 +56,14 @@ plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
 python3 ${scripts}/clustering/clustering.py \
   --matrix     ${home}/clustering/king_all.king \
   --matrix-ids ${home}/clustering/king_all.king.id \
-  --meta-file  ${home}/tmp/samples.meta.tsv \
+  --meta-file  ${home}/clustering/samples.meta.tsv \
   --outpath    ${home}/clustering
 
 python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
   --work     ${home}
+
+for 
 
 find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
   for f do
@@ -74,29 +76,33 @@ find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
 # 2. BABACHI, https://github.com/autosome-ru/BABACHI 
 
 run_babachi() { 
-    file=$1
-    name=$(basename $file .bed)
-    
-    babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/ 
-    find ${home}/BADs -type f -exec sh -c 'for f in "$@"; do if [ "$(wc -l < "$f")" -eq 1 ]; then rm "$f"; fi; done' sh {} +
-    babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
-    python3 ${scripts}/babachi/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
-    
-    if [ -e "${home}/BADs/${name}.badmap.bed" ]; then
-        python3 ${scripts}/babachi/add_bad_to_bed.py \
-            --bed    ${home}/BEDs/${name}.bed \
-            --bad    ${home}/BADs/${name}.badmap.bed \
-            --output ${home}/BEDs/${name}.with_bad.bed
-    fi
-    
-    rm ${home}/BEDs/${name}.bed ${home}/BADs/${name}.badmap.visualization/*.svg
+    name=$(basename $1 .bed)
+    babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/ >/dev/null 2>&1
+
+    if [ "$(wc -l < "${home}/BADs/${name}.badmap.bed")" -gt 1 ]; then
+        echo ${home}/BADs/${name}.badmap.bed
+        babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
+        python3 ${scripts}/babachi/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
+        rm ${home}/BADs/${name}.badmap.visualization/*.svg
+    fi    
+    python3 ${scripts}/babachi/add_bad_to_bed.py \
+        --bed    ${home}/BEDs/${name}.bed \
+        --bad    ${home}/BADs/${name}.badmap.bed \
+        --output ${home}/BEDs/${name}.with_bad.bed
+    rm ${home}/BEDs/${name}.bed
 }
 
 export -f run_babachi
-find ${home}/BEDs -name *.bed | parallel -j 10 run_babachi {}
+find ${home}/BEDs -name *.bed | parallel -j 10 run_babachi {} 
 
+# 3. MixALiMe for TFs, http://mixalime.georgy.top/tutorial/quickstart.html
 
-
+for model in MCNB NB BetaNB; do
+    mixalime create ${home}/mixalime/${model} ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
+    mixalime fit ${home}/mixalime/${model} $model
+    mixalime test ${home}/mixalime/${model}
+    
+done
 
 
 
