@@ -12,7 +12,7 @@ if [ ! -d ${home}/hocomoco/v13/pwm ]; then
         | tar -xz -C ${home}/hocomoco/v13/pwm --strip-components=2
 fi
 
-# 1. Merging files
+# 1. Merging files & Clustering
 
 python3 ${scripts}/renamer.py 
 for file in ${home}/VCFs/*.vcf.gz; do
@@ -43,8 +43,6 @@ bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
 # for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
 # of all the duplicates, only one should be left 
 
-# 2. Clusterization, https://doi.org/10.1186/s13742-015-0047-8 
-
 plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --allow-extra-chr \
   --threads $threads \
@@ -57,6 +55,44 @@ python3 ${scripts}/clustering.py \
   --meta-file  ${home}/tmp/samples.meta.tsv \
   --outpath    ${home}/clustering
 
+python3 ${scripts}/create_bed_clusters.py \
+  --metadata ${home}/clustering/metadata.clustered.tsv \
+  --work     ${home}
+
+# 2. BABACHI, https://github.com/autosome-ru/BABACHI 
+
+run_babachi() { 
+    file=$1
+    home=$2
+    name=$(basename $file .vcf.gz)
+    
+    babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/ 
+    find ${home}/BADs -type f -exec sh -c 'for f in "$@"; do if [ "$(wc -l < "$f")" -eq 1 ]; then rm "$f"; fi; done' sh {} +
+    babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
+    python3 ${home}/scripts/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
+    
+    if [ -e "${home}/BADs/${name}.badmap.bed" ]; then
+        python3 ${home}/scripts/add_bad_to_bed.py \
+            --bed    ${home}/BEDs/${name}.bed \
+            --bad    ${home}/BADs/${name}.badmap.bed \
+            --output ${home}/BEDs/${name}.with_bad.bed
+    fi
+    
+    rm ${home}/BEDs/${name}.bed ${home}/BADs/${name}.badmap.visualization/*.svg
+}
+
+export -f run_babachi
+find ${home}/BEDs -name *.bed | parallel -j $threads run_babachi {} $home
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -64,32 +100,6 @@ python3 ${scripts}/clustering.py \
 
 
 # NOT UPDATED || OLD VERSION
-
-# 2. BABACHI, https://github.com/autosome-ru/BABACHI 
-
-run_babachi() { 
-    file=$1
-    home='/home/subpolare/adastra-v7'
-    name=$(basename $file .vcf.gz)
-
-    if [ $(zcat $file | grep '^chr' | wc -l) -ne 0 ]; then
-        python3 ${home}/scripts/create_bed.py -i $file -o ${home}/BEDs/${name}.bed
-        sed -i '/\./d' ${home}/BEDs/${name}.bed
-        babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/
-        find ${home}/BADs -type f -exec sh -c 'for f in "$@"; do if [ "$(wc -l < "$f")" -eq 1 ]; then rm "$f"; fi; done' sh {} +
-        # babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
-        # python3 ${home}/scripts/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
-        if [ -e "${home}/BADs/${name}.badmap.bed" ]; then
-            python3 ${home}/scripts/add_bad_to_bed.py \
-                --bed ${home}/BEDs/${name}.bed \
-                --bad ${home}/BADs/${name}.badmap.bed \
-                --output ${home}/BEDs/${name}.with_bad.bed
-        fi
-        rm ${home}/BEDs/${name}.bed # ${home}/BADs/${name}.badmap.visualization/*.svg
-    fi
-}
-export -f run_babachi
-find ${home}/VCFs -name *.vcf.gz | parallel -j $threads run_babachi
 
 # 3. MixALiMe for TFs, http://mixalime.georgy.top/tutorial/quickstart.html
 
