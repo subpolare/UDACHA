@@ -16,6 +16,7 @@ The code takes as input GATK/bcftools-derived per-sample bgzipped, tabix-indexed
 pip install babachi 
 pip install mixalime  
 conda install bioconda::plink2
+pip install tqdm
 ```
 
 2. Install [bcftools](https://www.htslib.org/download/) according to the instructions from the developers.
