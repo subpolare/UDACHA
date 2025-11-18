@@ -4,7 +4,7 @@ threads=50
 
 # DO NOT EDIT BELOW
 
-mkdir -p ${home}/tmp/ ${home}/VCFs/ ${home}/BEDs/ ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/
+mkdir -p ${home}/tmp/ ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/
 if [ ! -d ${home}/hocomoco/v13/pwm ]; then
     set -euo pipefail
     mkdir -p ${home}/hocomoco/v13/pwm
@@ -27,8 +27,7 @@ find ${home}/VCFs -maxdepth 1 -type f -name "*.vcf.gz" ! -name "*.without_MAF.vc
     done
 
 find ${home}/VCFs -type f -name "*.without_MAF.vcf.gz" | sort > ${home}/tmp/vcfs.list
-
-echo -e "sample_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/tmp/samples.meta.tsv
+echo -e "indiv_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/tmp/samples.meta.tsv
 while IFS= read -r f; do
     b=$(basename "$f")
     base=${b%.vcf.gz}
@@ -37,55 +36,26 @@ while IFS= read -r f; do
     printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/tmp/samples.meta.tsv
 done < ${home}/tmp/vcfs.list
 
-bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/tmp/vcfs.list
-
-# If there is an duplicate error, use command below to find duplicates: 
-# for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
-# of all the duplicates, only one should be left  
-
+bcftools merge -m none --threads $threads -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/tmp/vcfs.list 
 bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
+
+# If there is an duplicate error in bcftools merge, use command below to find duplicates: 
+# for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
+# of all the duplicates, only one should be left 
 
 # 2. Clusterization, https://doi.org/10.1186/s13742-015-0047-8 
 
-# plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
-#   --allow-extra-chr --threads $threads --double-id \
-#   --vcf-half-call missing \
-#   --make-king square \
-#   --out ${home}/tmp/king_all
-# cut -f2 ${home}/tmp/king_all.king.id > ${home}/tmp/king.samples
-
 plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --allow-extra-chr \
-  --double-id \
-  --vcf-half-call missing \
-  --snps-only just-acgt \
-  --max-alleles 2 \
-  --make-pgen \
-  --out ${home}/tmp/p \
-  --threads ${threads}
+  --threads $threads \
+  --make-king square \
+  --out ${home}/clustering/king_all
 
-plink2 --pfile ${home}/tmp/p \
-  --allow-extra-chr \
-  --snps-only just-acgt --max-alleles 2 \
-  --maf 0.01 \
-  --geno 0.99 \
-  --thin-count 100000 \
-  --export A \
-  --out ${home}/tmp/geno_sampled \
-  --threads ${threads}
-
-python3 ${scripts}/clusterization.py \
-  --king     ${home}/tmp/king_all.king \
-  --king-id  ${home}/tmp/king_all.king.id \
-  --output   ${home}/tmp/geno_clusters.tsv \
-  --dist0    0.4 \
-  --cut      0.1
-
-
-# 3. BABACHI, https://github.com/autosome-ru/BABACHI 
-
-
-
+python3 clustering_script.py \
+  --matrix     ${home}/clustering/king_all.king \
+  --matrix-ids ${home}/clustering/king_all.king.id \
+  --meta-file  ${home}/tmp/samples.meta.tsv \
+  --outpath    ${home}/clustering
 
 
 
