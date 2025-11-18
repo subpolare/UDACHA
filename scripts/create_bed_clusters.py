@@ -1,11 +1,6 @@
-import sys
-import os
-import gzip
-import argparse
-import csv
+import sys, os, gzip, argparse, csv
 from collections import defaultdict
 from tqdm.auto import tqdm
-
 
 BED_HEADER = [
     '#chr',
@@ -18,7 +13,6 @@ BED_HEADER = [
     'alt_count',
     'sample_id',
 ]
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -62,12 +56,13 @@ def make_vcf_path(path_from_metadata, work_dir):
     return os.path.join(work_dir, 'VCFs', name)
 
 
-def write_variants_from_vcf_to_bed(vcf_path, bed_handle):
+def extract_variants_from_vcf(vcf_path):
+    records = []
     try:
         vcf = open_vcf(vcf_path)
     except OSError as e:
         print(f'Warning: cannot open VCF {vcf_path}: {e}', file=sys.stderr)
-        return
+        return records
 
     with vcf:
         sample_ids = []
@@ -83,7 +78,7 @@ def write_variants_from_vcf_to_bed(vcf_path, bed_handle):
                 continue
             if not sample_ids:
                 print(f'Error: No sample columns found in VCF {vcf_path}.', file=sys.stderr)
-                return
+                return records
 
             fields = line.split('\t')
             if len(fields) < 8:
@@ -129,6 +124,8 @@ def write_variants_from_vcf_to_bed(vcf_path, bed_handle):
                     ref_count = alt_count = '0'
 
                 bed_id = var_id if var_id != '.' else '.'
+                if bed_id == '.':
+                    continue
 
                 bed_fields = [
                     chrom,
@@ -141,7 +138,8 @@ def write_variants_from_vcf_to_bed(vcf_path, bed_handle):
                     alt_count,
                     sample_id,
                 ]
-                bed_handle.write('\t'.join(bed_fields) + '\n')
+                records.append(bed_fields)
+    return records
 
 
 def load_clusters(metadata_path, indiv_col, path_col, work_dir):
@@ -176,6 +174,20 @@ def load_clusters(metadata_path, indiv_col, path_col, work_dir):
     return clusters
 
 
+def chrom_sort_key(chrom):
+    c = chrom
+    if c.lower().startswith('chr'):
+        c = c[3:]
+    try:
+        n = int(c)
+        if 1 <= n <= 22:
+            return (0, n)
+        else:
+            return (1, n)
+    except ValueError:
+        return (2, c)
+
+
 def main():
     args = parse_args()
 
@@ -200,10 +212,16 @@ def main():
 
         out_bed_path = os.path.join(outdir, f'{indiv_id}.bed')
 
+        all_records = []
+        for vcf_path in vcf_paths:
+            all_records.extend(extract_variants_from_vcf(vcf_path))
+
+        all_records.sort(key=lambda row: (*chrom_sort_key(row[0]), int(row[1])))
+
         with open(out_bed_path, 'w') as bed:
             bed.write('\t'.join(BED_HEADER) + '\n')
-            for vcf_path in vcf_paths:
-                write_variants_from_vcf_to_bed(vcf_path, bed)
+            for rec in all_records:
+                bed.write('\t'.join(rec) + '\n')
 
 
 if __name__ == '__main__':
