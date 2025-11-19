@@ -75,7 +75,7 @@ find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
 
 run_babachi() { 
     name=$(basename $1 .bed)
-    babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/ >/dev/null 2>&1
+    babachi ${home}/BEDs/${name}.bed -j 22 -O ${home}/BADs/ >/dev/null 2>&1
 
     if [ "$(wc -l < "${home}/BADs/${name}.badmap.bed")" -gt 1 ]; then
         echo ${home}/BADs/${name}.badmap.bed
@@ -91,7 +91,7 @@ run_babachi() {
 }
 
 export -f run_babachi
-find ${home}/BEDs -name *.bed | parallel -j 10 run_babachi {} 
+find ${home}/BEDs -name *.bed | parallel -j 3 run_babachi {} 
 
 # 3. MixALiMe for TFs, http://mixalime.georgy.top/tutorial/quickstart.html
 
