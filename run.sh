@@ -118,7 +118,7 @@ TFs_combine() {
         --subname "TF_${tf}" \
         --group ${home}/mixalime/groups/factors_${tf}.list \
         $project
-    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') $tf 'is done' >> ${home}/logs/status_factors.txt
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $tf >> ${home}/logs/status_factors.txt
 }
 export -f TFs_combine 
 
@@ -128,7 +128,7 @@ cell_combine() {
         --subname "CELL_${cell}" \
         --group ${home}/mixalime/groups/cell_${cell}.list \
         $project
-    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') $tf 'is done' >> ${home}/logs/status_cells.txt
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $tf 'is done' >> ${home}/logs/status_cells.txt
 }
 export -f cell_combine
 
