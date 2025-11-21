@@ -128,7 +128,7 @@ cell_combine() {
         --subname "CELL_${cell}" \
         --group ${home}/mixalime/groups/cell_${cell}.list \
         $project
-    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $tf 'is done' >> ${home}/logs/status_cells.txt
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $cell 'is done' >> ${home}/logs/status_cells.txt
 }
 export -f cell_combine
 
