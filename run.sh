@@ -112,32 +112,39 @@ done < ${home}/mixalime/groups/cell.list
 
 # 5. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html
 
+TFs_combine() {
+    local tf=$1
+    python3 ${scripts}/mixalime/limiter.py --threads 2 combine \
+        --subname "TF_${tf}" \
+        --group ${home}/mixalime/groups/factors_${tf}.list \
+        $project
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') $tf 'is done' >> ${home}/logs/status_factors.txt
+}
+export -f TFs_combine 
+
+cell_combine() {
+    local cell=$1
+    python3 ${scripts}/mixalime/limiter.py --threads 2 combine \
+        --subname "CELL_${cell}" \
+        --group ${home}/mixalime/groups/cell_${cell}.list \
+        $project
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') $tf 'is done' >> ${home}/logs/status_cells.txt
+}
+export -f cell_combine
+
 for model in MCNB NB BetaNB; do
     project=${home}/mixalime/${model}
+    export project
 
     python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
     python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $model
     python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
 
-    echo $(date '+%Y-%m-%d %H:%M:%S') START > ${home}/logs/status_factors.txt
-    while read tf; do
-        python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
-            --subname "TF_${tf}" \
-            --group ${home}/mixalime/groups/factors_${tf}.list \
-            $project
-        echo $(date '+%Y-%m-%d %H:%M:%S') $tf >> ${home}/logs/status_factors.txt
-    done < ${home}/mixalime/groups/factors.list
-    echo $(date '+%Y-%m-%d %H:%M:%S') END > ${home}/logs/status_factors.txt
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE > ${home}/logs/status_factors.txt
+    parallel -j "$((threads / 2))" TFs_combine :::: ${home}/mixalime/groups/factors.list
 
-    echo $(date '+%Y-%m-%d %H:%M:%S') START > ${home}/logs/status_cells.txt
-    while read cell; do
-        python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
-            --subname "CELL_${cell}" \
-            --group ${home}/mixalime/groups/cell_${cell}.list \
-            $project
-        echo $(date '+%Y-%m-%d %H:%M:%S') $tf >> ${home}/logs/status_cells.txt
-    done < ${home}/mixalime/groups/cell.list
-    echo $(date '+%Y-%m-%d %H:%M:%S') END > ${home}/logs/status_cells.txt
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE > ${home}/logs/status_cells.txt
+    parallel -j "$((threads / 2))" cell_combine :::: ${home}/mixalime/groups/cell.list
 
     python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
