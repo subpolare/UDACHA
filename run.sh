@@ -73,8 +73,8 @@ find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
 
 # 2. BABACHI, https://github.com/autosome-ru/BABACHI 
 
-run_babachi() { 
-    name=$(basename $1 .bed)
+find ${home}/BEDs -maxdepth 1 -name 'INDIV_????.bed' -print0 | while IFS= read -r -d '' file; do
+    name=$(basename $file .bed)
     babachi ${home}/BEDs/${name}.bed -j 22 -O ${home}/BADs/ >/dev/null 2>&1
 
     if [ "$(wc -l < "${home}/BADs/${name}.badmap.bed")" -gt 1 ]; then
@@ -88,10 +88,7 @@ run_babachi() {
         --bad    ${home}/BADs/${name}.badmap.bed \
         --output ${home}/BEDs/${name}.with_bad.bed
     rm ${home}/BEDs/${name}.bed
-}
-
-export -f run_babachi
-find ${home}/BEDs -name *.bed | parallel -j 3 run_babachi {} 
+done 
 
 # 3. MixALiMe for TFs, http://mixalime.georgy.top/tutorial/quickstart.html
 
