@@ -111,10 +111,9 @@ done < ${home}/mixalime/groups/cell.list
 for model in MCNB NB BetaNB; do
     project=${home}/mixalime/${model}
 
-    python ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
-    
-    mixalime fit $project $model
-    mixalime test $project
+    python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
+    python3 ${scripts}/mixalime/limiter.py --threads $threads  fit $project $model
+    python3 ${scripts}/mixalime/limiter.py --threads $threads  test $project
 
     while read tf; do
         mixalime combine \
