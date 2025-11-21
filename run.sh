@@ -111,7 +111,8 @@ done < ${home}/mixalime/groups/cell.list
 for model in MCNB NB BetaNB; do
     project=${home}/mixalime/${model}
 
-    mixalime create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
+    python ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
+    
     mixalime fit $project $model
     mixalime test $project
 
