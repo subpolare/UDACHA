@@ -112,25 +112,25 @@ for model in MCNB NB BetaNB; do
     project=${home}/mixalime/${model}
 
     python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
-    python3 ${scripts}/mixalime/limiter.py --threads $threads  fit $project $model
-    python3 ${scripts}/mixalime/limiter.py --threads $threads  test $project
+    python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $model
+    python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
 
     while read tf; do
-        mixalime combine \
+        python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
             --subname "TF_${tf}" \
             --group ${home}/mixalime/groups/factors_${tf}.list \
             $project
     done < ${home}/mixalime/groups/factors.list
 
     while read cell; do
-        mixalime combine \
+        python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
             --subname "CELL_${cell}" \
             --group ${home}/mixalime/groups/cell_${cell}.list \
             $project
     done < ${home}/mixalime/groups/cell.list
 
-    mixalime export all $project ${home}/mixalime/results_${model}
-    mixalime plot all $project ${home}/mixalime/results_${model}
+    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
+    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
 done
 
 
