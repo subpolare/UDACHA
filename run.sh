@@ -8,7 +8,7 @@ export home
 export scripts 
 export threads
 
-mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/ ${home}/mixalime/groups/
+mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/ ${home}/mixalime/groups/ ${home}/logs
 if [ ! -d ${home}/hocomoco/v13/pwm ]; then
     set -euo pipefail
     mkdir -p ${home}/hocomoco/v13/pwm
@@ -16,7 +16,7 @@ if [ ! -d ${home}/hocomoco/v13/pwm ]; then
         | tar -xz -C ${home}/hocomoco/v13/pwm --strip-components=2
 fi
 
-# 1. Merging files & Clustering
+# 1. Merging files 
 
 python3 ${scripts}/clustering/renamer.py 
 for file in ${home}/VCFs/*.vcf.gz; do
@@ -47,6 +47,8 @@ bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
 # for f in VCFs/*.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
 # of all the duplicates, only one should be left 
 
+# 2. Clustering using PLINK2
+
 plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --allow-extra-chr \
   --threads $threads \
@@ -71,7 +73,7 @@ find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
   done
 ' sh {} +
 
-# 2. BABACHI, https://github.com/autosome-ru/BABACHI 
+# 3. BABACHI, https://github.com/autosome-ru/BABACHI 
 
 find ${home}/BEDs -maxdepth 1 -name 'INDIV_????.bed' -print0 | while IFS= read -r -d '' file; do
     name=$(basename $file .bed)
@@ -90,7 +92,7 @@ find ${home}/BEDs -maxdepth 1 -name 'INDIV_????.bed' -print0 | while IFS= read -
     rm ${home}/BEDs/${name}.bed
 done 
 
-# 3. MixALiMe for TFs, http://mixalime.georgy.top/tutorial/quickstart.html
+# 4. Create lists of the TFs and cell lines 
 
 cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/factors.list
 while read tf; do
@@ -108,6 +110,8 @@ while read cell; do
         > ${home}/mixalime/groups/cell_${cell}.list
 done < ${home}/mixalime/groups/cell.list
 
+# 5. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html
+
 for model in MCNB NB BetaNB; do
     project=${home}/mixalime/${model}
 
@@ -115,19 +119,25 @@ for model in MCNB NB BetaNB; do
     python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $model
     python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
 
+    echo $(date '+%Y-%m-%d %H:%M:%S') START > ${home}/logs/status_factors.txt
     while read tf; do
         python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
             --subname "TF_${tf}" \
             --group ${home}/mixalime/groups/factors_${tf}.list \
             $project
+        echo $(date '+%Y-%m-%d %H:%M:%S') $tf >> ${home}/logs/status_factors.txt
     done < ${home}/mixalime/groups/factors.list
+    echo $(date '+%Y-%m-%d %H:%M:%S') END > ${home}/logs/status_factors.txt
 
+    echo $(date '+%Y-%m-%d %H:%M:%S') START > ${home}/logs/status_cells.txt
     while read cell; do
         python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
             --subname "CELL_${cell}" \
             --group ${home}/mixalime/groups/cell_${cell}.list \
             $project
+        echo $(date '+%Y-%m-%d %H:%M:%S') $tf >> ${home}/logs/status_cells.txt
     done < ${home}/mixalime/groups/cell.list
+    echo $(date '+%Y-%m-%d %H:%M:%S') END > ${home}/logs/status_cells.txt
 
     python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
