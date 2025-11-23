@@ -114,7 +114,7 @@ done < ${home}/mixalime/groups/cell.list
 
 TFs_combine() {
     local tf=$1
-    python3 ${scripts}/mixalime/limiter.py --threads 2 combine \
+    python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
         --subname "TF_${tf}" \
         --group ${home}/mixalime/groups/factors_${tf}.list \
         $project
@@ -124,7 +124,7 @@ export -f TFs_combine
 
 cell_combine() {
     local cell=$1
-    python3 ${scripts}/mixalime/limiter.py --threads 2 combine \
+    python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
         --subname "CELL_${cell}" \
         --group ${home}/mixalime/groups/cell_${cell}.list \
         $project
@@ -140,8 +140,11 @@ for model in MCNB NB BetaNB; do
     python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $model
     python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
 
-    parallel -j "$((threads / 2))" TFs_combine :::: ${home}/mixalime/groups/factors.list
-    parallel -j "$((threads / 2))" cell_combine :::: ${home}/mixalime/groups/cell.list
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_factors.txt 
+    parallel -j $threads --load 80% --noswap --delay 1 --memfree 256G TFs_combine  :::: ${home}/mixalime/groups/factors.list
+
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_cells.txt 
+    parallel -j $threads --load 80% --noswap --delay 1 --memfree 256G cell_combine :::: ${home}/mixalime/groups/cell.list
 
     python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
