@@ -141,10 +141,10 @@ for model in MCNB NB BetaNB; do
     python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
 
     echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_factors.txt 
-    parallel -j $threads --load 80% --noswap --delay 1 --memfree 256G TFs_combine :::: ${home}/mixalime/groups/factors.list
+    parallel -j $threads --load 80% --noswap --delay 1 --memfree 512G TFs_combine :::: ${home}/mixalime/groups/factors.list
 
     echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_cells.txt 
-    parallel -j $threads --load 80% --noswap --delay 1 --memfree 256G cell_combine :::: ${home}/mixalime/groups/cell.list
+    parallel -j $threads --load 80% --noswap --delay 1 --memfree 512G cell_combine :::: ${home}/mixalime/groups/cell.list
 
     python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
