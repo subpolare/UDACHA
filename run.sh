@@ -132,6 +132,16 @@ cell_combine() {
 }
 export -f cell_combine
 
+mixalime_export() {
+    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
+}
+export -f mixalime_export
+
+mixalime_plot() {
+    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
+}
+export -f mixalime_plot
+
 for model in MCNB NB BetaNB; do
     project=${home}/mixalime/${model}
     export project
@@ -146,13 +156,13 @@ for model in MCNB NB BetaNB; do
     echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR CELLS > ${home}/logs/status_cells.txt 
     parallel -j $threads --load 80% --noswap --delay 1 --memfree 512G cell_combine :::: ${home}/mixalime/groups/cell.list
 
-    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
-    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
+    parallel -j 1 --load 80% --noswap --delay 1 --memfree 512G mixalime_export ::: {1}
+    parallel -j 1 --load 80% --noswap --delay 1 --memfree 512G mixalime_plot ::: {1}
 done
 
 
 
-
+parallel -j 1 --load 80% --noswap --delay 1 --memfree 512G mixalime_export ::: {1}
 
 
 
