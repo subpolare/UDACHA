@@ -145,6 +145,7 @@ export -f mixalime_plot
 for model in MCNB NB BetaNB; do
     project=${home}/mixalime/${model}
     export project
+    export model 
 
     python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
     python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $model
