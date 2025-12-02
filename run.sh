@@ -112,36 +112,6 @@ done < ${home}/mixalime/groups/cell.list
 
 # 5. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html
 
-TFs_combine() {
-    local tf=$1
-    python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
-        --subname "TF_${tf}" \
-        --group ${home}/mixalime/groups/factors_${tf}.list \
-        $project
-    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $tf >> ${home}/logs/status_factors.txt
-}
-export -f TFs_combine 
-
-cell_combine() {
-    local cell=$1
-    python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
-        --subname "CELL_${cell}" \
-        --group ${home}/mixalime/groups/cell_${cell}.list \
-        $project
-    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $cell 'is done' >> ${home}/logs/status_cells.txt
-}
-export -f cell_combine
-
-mixalime_export() {
-    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
-}
-export -f mixalime_export
-
-mixalime_plot() {
-    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
-}
-export -f mixalime_plot
-
 for model in MCNB NB BetaNB; do
     project=${home}/mixalime/${model}
     export project
@@ -151,19 +121,33 @@ for model in MCNB NB BetaNB; do
     python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $model
     python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
 
+    python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
+
     echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_factors.txt 
-    parallel -j $threads --load 80% --noswap --delay 1 --memfree 512G TFs_combine :::: ${home}/mixalime/groups/factors.list
+    while read -r tf; do
+        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $tf >> ${home}/logs/status_cells.txt
+        python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
+            --subname TF_${tf} \
+            --group ${home}/mixalime/groups/factors_${tf}.list \
+            ${project}
+        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $tf >> ${home}/logs/status_cells.txt
+    done < ${home}/mixalime/groups/factors.list
 
-    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR CELLS > ${home}/logs/status_cells.txt 
-    parallel -j $threads --load 80% --noswap --delay 1 --memfree 512G cell_combine :::: ${home}/mixalime/groups/cell.list
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR CELLS > ${home}/logs/status_cells.txt  
+    while read -r cell; do
+        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $cell >> ${home}/logs/status_cells.txt
+        python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
+            --subname TF_${tf} \
+            --group ${home}/mixalime/groups/factors_${tf}.list \
+            ${project}
+        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $cell >> ${home}/logs/status_cells.txt
+    done < ${home}/mixalime/groups/cell.list
 
-    parallel -j 1 --load 80% --noswap --delay 1 --memfree 512G mixalime_export ::: {1}
-    parallel -j 1 --load 80% --noswap --delay 1 --memfree 512G mixalime_plot ::: {1}
+    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
+    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
 done
 
 
-
-parallel -j 1 --load 80% --noswap --delay 1 --memfree 512G mixalime_export ::: {1}
 
 
 
