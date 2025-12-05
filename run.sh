@@ -137,8 +137,8 @@ for model in MCNB NB BetaNB; do
     while read -r cell; do
         echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $cell >> ${home}/logs/status_cells.txt
         python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
-            --subname TF_${tf} \
-            --group ${home}/mixalime/groups/factors_${tf}.list \
+            --subname CELL_${cell} \
+            --group ${home}/mixalime/groups/cell_${cell}.list \
             ${project}
         echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $cell >> ${home}/logs/status_cells.txt
     done < ${home}/mixalime/groups/cell.list
