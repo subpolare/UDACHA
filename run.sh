@@ -126,11 +126,10 @@ for model in MCNB NB BetaNB; do
     echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_factors.txt 
     while read -r tf; do
         echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $tf >> ${home}/logs/status_factors.txt
-        python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
+        python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
             --subname TF_${tf} \
             --group ${home}/mixalime/groups/factors_${tf}.list \
             ${project}
-        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $tf >> ${home}/logs/status_factors.txt
     done < ${home}/mixalime/groups/factors.list
 
     echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR CELLS > ${home}/logs/status_cells.txt  
@@ -140,14 +139,11 @@ for model in MCNB NB BetaNB; do
             --subname CELL_${cell} \
             --group ${home}/mixalime/groups/cell_${cell}.list \
             ${project}
-        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') END $cell >> ${home}/logs/status_cells.txt
     done < ${home}/mixalime/groups/cell.list
 
     python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
 done
-
-
 
 
 
