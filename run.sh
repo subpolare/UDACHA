@@ -1,75 +1,158 @@
-# Last updated 13 Feb 2025
-home='/home/subpolare/adastra-v7'
-threads=10
+home='/sandbox/subpolare/adastra'
+scripts='/home/subpolare/adastra-v7/scripts'
+threads=100
 
-# 1. Preparing files
+# DO NOT EDIT BELOW
 
-python3 ${home}/scripts/renamer.py 
+mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/ ${home}/mixalime/groups/ ${home}/logs
+if [ ! -d ${home}/hocomoco/v13/pwm ]; then
+    set -euo pipefail
+    mkdir -p ${home}/hocomoco/v13/pwm
+    curl -fsSL "https://hocomoco13.autosome.org/final_bundle/hocomoco13/H13RSNP/H13RSNP_pwm.tar.gz" \
+        | tar -xz -C ${home}/hocomoco/v13/pwm --strip-components=2
+fi
+
+# 1. Merging files 
+
+python3 ${scripts}/clustering/renamer.py 
 for file in ${home}/VCFs/*.vcf.gz; do
-    bcftools index -f $file
+    bcftools index --threads $threads -f $file
 done
 
-find ${home}/VCFs -type f -name "*.vcf.gz" | sort > ${home}/tmp/vcfs.list
-
-echo -e "sample_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/tmp/samples.meta.tsv
-while IFS= read -r f; do
-  b=$(basename "$f")
-  base=${b%.vcf.gz}
-  IFS=_ read -r tf cell fileid gse <<< "$base"
-  sid=$(bcftools query -l "$f")
-  printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/tmp/samples.meta.tsv
-done < ${home}/tmp/vcfs.list
-
-# 2. BABACHI, https://github.com/autosome-ru/BABACHI 
-
-run_babachi() { 
-    file=$1
-    home='/home/subpolare/adastra-v7'
-    name=$(basename $file .vcf.gz)
-
-    if [ $(zcat $file | grep '^chr' | wc -l) -ne 0 ]; then
-        python3 ${home}/scripts/create_bed.py -i $file -o ${home}/BEDs/${name}.bed
-        sed -i '/\./d' ${home}/BEDs/${name}.bed
-        babachi ${home}/BEDs/${name}.bed -O ${home}/BADs/
-        find ${home}/BADs -type f -exec sh -c 'for f in "$@"; do if [ "$(wc -l < "$f")" -eq 1 ]; then rm "$f"; fi; done' sh {} +
-        # babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
-        # python3 ${home}/scripts/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
-        if [ -e "${home}/BADs/${name}.badmap.bed" ]; then
-            python3 ${home}/scripts/add_bad_to_bed.py \
-                --bed ${home}/BEDs/${name}.bed \
-                --bad ${home}/BADs/${name}.badmap.bed \
-                --output ${home}/BEDs/${name}.with_bad.bed
-        fi
-        rm ${home}/BEDs/${name}.bed # ${home}/BADs/${name}.badmap.visualization/*.svg
-    fi
-}
-export -f run_babachi
-find ${home}/VCFs -name *.vcf.gz | parallel -j $threads run_babachi
-
-# 3. MixALiMe for TFs, http://mixalime.georgy.top/tutorial/quickstart.html
-
-for model in MCNB NB BetaNB; do
-    mixalime create ${home}/mixalime/${model} ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
-    mixalime fit ${home}/mixalime/${model} $model
-    mixalime test ${home}/mixalime/${model}
-
-    TFs=$(for file in ${home}/BEDs/*.with_bad.bed; do
-        basename "$file" | cut -d'_' -f1
-    done)
-
-    for TF in $(echo "$TFs" | sort -u); do
-        mixalime combine ${home}/mixalime/${model} --group "m:${home}/BEDs/${TF}_*.with_bad.bed" --subname $TF
+find ${home}/VCFs -maxdepth 1 -type f -name "*.vcf.gz" ! -name "*.without_MAF.vcf.gz" -print0 |
+    while IFS= read -r -d '' f; do
+        out="${f%.vcf.gz}.without_MAF.vcf.gz"
+        bcftools annotate --threads $threads -x INFO/MAF -Oz -o "$out" "$f"
+        bcftools index --threads $threads -f "$out"
     done
 
-    mixalime export all ${home}/mixalime/${model} ${home}/mixalime/results_${model}
-    mixalime plot all ${home}/mixalime/${model} ${home}/mixalime/results_${model}
+find ${home}/VCFs -type f -name "*.without_MAF.vcf.gz" | sort > ${home}/clustering/vcfs.list
+echo -e "indiv_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/clustering/samples.meta.tsv
+while IFS= read -r f; do
+    b=$(basename "$f")
+    base=${b%.without_MAF.vcf.gz}
+    IFS=_ read -r tf cell fileid gse <<< "$base"
+    sid=$(bcftools query -l "$f")
+    printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/clustering/samples.meta.tsv
+done < ${home}/clustering/vcfs.list
+
+bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/clustering/vcfs.list 
+bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
+
+# If there is an duplicate error in bcftools merge, use command below to find duplicates: 
+# for f in ${home}/VCFs/*.without_MAF.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
+# of all the duplicates, only one should be left 
+
+# 2. Clustering using PLINK2
+
+plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
+  --allow-extra-chr \
+  --threads $threads \
+  --make-king square \
+  --out ${home}/clustering/king_all
+
+python3 ${scripts}/clustering/clustering.py \
+  --matrix     ${home}/clustering/king_all.king \
+  --matrix-ids ${home}/clustering/king_all.king.id \
+  --meta-file  ${home}/clustering/samples.meta.tsv \
+  --outpath    ${home}/clustering
+
+python3 ${scripts}/clustering/create_bed_clusters.py \
+  --metadata ${home}/clustering/metadata.clustered.tsv \
+  --work     ${home}
+
+find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
+  for f do
+    if [ "$(wc -l < "$f")" -eq 1 ]; then
+      rm "$f"
+    fi
+  done
+' sh {} +
+
+# 3. BABACHI, https://github.com/autosome-ru/BABACHI 
+
+find ${home}/BEDs -maxdepth 1 -name 'INDIV_????.bed' -print0 | while IFS= read -r -d '' file; do
+    name=$(basename $file .bed)
+    babachi ${home}/BEDs/${name}.bed -j 22 -O ${home}/BADs/ >/dev/null 2>&1
+
+    if [ "$(wc -l < "${home}/BADs/${name}.badmap.bed")" -gt 1 ]; then
+        echo ${home}/BADs/${name}.badmap.bed
+        babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
+        python3 ${scripts}/babachi/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
+        rm ${home}/BADs/${name}.badmap.visualization/*.svg
+    fi    
+    python3 ${scripts}/babachi/add_bad_to_bed.py \
+        --bed    ${home}/BEDs/${name}.bed \
+        --bad    ${home}/BADs/${name}.badmap.bed \
+        --output ${home}/BEDs/${name}.with_bad.bed
+    rm ${home}/BEDs/${name}.bed
+done 
+
+# 4. Create lists of the TFs and cell lines 
+
+cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/factors.list
+while read tf; do
+    awk -F'\t' -v tf="$tf" 'NR > 1 && $2 == tf { print $7 }' ${home}/clustering/metadata.clustered.tsv \
+        | sort -u \
+        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
+        > ${home}/mixalime/groups/factors_"$tf".list
+done < ${home}/mixalime/groups/factors.list
+
+cut -f3 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/cell.list
+while read cell; do
+    awk -F'\t' -v cell="$cell" 'NR > 1 && $3 == cell { print $7 }' ${home}/clustering/metadata.clustered.tsv \
+        | sort -u \
+        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
+        > ${home}/mixalime/groups/cell_${cell}.list
+done < ${home}/mixalime/groups/cell.list
+
+# 5. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html
+
+for model in MCNB NB BetaNB; do
+    project=${home}/mixalime/${model}
+    export project
+    export model 
+
+    python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
+    python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $model
+    python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
+
+    python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
+
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_factors.txt 
+    while read -r tf; do
+        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $tf >> ${home}/logs/status_factors.txt
+        python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
+            --subname TF_${tf} \
+            --group ${home}/mixalime/groups/factors_${tf}.list \
+            ${project}
+    done < ${home}/mixalime/groups/factors.list
+
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR CELLS > ${home}/logs/status_cells.txt  
+    while read -r cell; do
+        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $cell >> ${home}/logs/status_cells.txt
+        python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
+            --subname CELL_${cell} \
+            --group ${home}/mixalime/groups/cell_${cell}.list \
+            ${project}
+    done < ${home}/mixalime/groups/cell.list
+
+    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
+    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
 done
+
+
+
+
+
+
+# NOT UPDATED || OLD VERSION
 
 # 4. Creating tables for TFs
 
 for model in MCNB NB BetaNB; do
     for TF in $(echo "$TFs" | sort -u); do 
-        python3 ${home}/scripts/create_tf_tables.py \
+        python3 ${scripts}/create_tf_tables.py \
             --mixalime ${home}/mixalime/results_${model}/pvalues/${TF}.tsv \
             --bed "${home}/BEDs/${TF}*.with_bad.bed" \
             --output ${home}/new-version/TF/${TF}_HUMAN_${model}.tsv
@@ -80,7 +163,7 @@ done
 
 for file in $(ls -1 ${home}/new-version/TF/*); do
     TF=$(basename $file | cut -f1 -d '.' | cut -f1 -d '_')
-    python3 scripts/make_snps_list.py \
+    python3 ${scripts}/make_snps_list.py \
         --genome '/home/subpolare/genome/GRCh38.primary_assembly.genome.fa' \
         --threads 20 \
         --input ${home}/new-version/TF/${TF}_HUMAN.tsv \

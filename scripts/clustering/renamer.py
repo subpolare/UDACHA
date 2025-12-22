@@ -2,8 +2,8 @@ import os
 import pandas as pd
 import re
 
-meta_file = '/home/subpolare/gtrd/meta/meta_6_may.tsv'
-vcf_dir = '/home/subpolare/adastra-v7/VCFs'
+meta_file = '/home/subpolare/adastra-v7/meta/meta_6_may.tsv'
+vcf_dir = '/sandbox/subpolare/adastra/VCFs'
 
 meta_df = pd.read_csv(meta_file, sep = '\t')
 algn_to_gsm = dict(zip(meta_df['algn_id'], meta_df['geo_gsm']))

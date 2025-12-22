@@ -1,6 +1,4 @@
-import os
-import argparse
-from tqdm import tqdm
+import os, argparse
 from cairosvg import svg2png
 
 def convert_svg_to_png(directory):
@@ -14,7 +12,7 @@ def convert_svg_to_png(directory):
         print(f'No SVG files found in the {directory}.')
         return
 
-    for svg_file in tqdm(svg_files, desc = 'Processing SVG files'):
+    for svg_file in svg_files:
         svg_path = os.path.join(directory, svg_file)
         png_file = os.path.splitext(svg_file)[0] + '.png'
         png_path = os.path.join(directory, png_file)
