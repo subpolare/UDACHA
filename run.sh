@@ -48,7 +48,8 @@ bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
 plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
   --allow-extra-chr \
   --threads $threads \
-  --make-king square \
+  --make-king square \    # for main pipeline
+  # --make-king-table \   # for debugging and results analyzing
   --out ${home}/clustering/king_all
 
 python3 ${scripts}/clustering/clustering.py \
