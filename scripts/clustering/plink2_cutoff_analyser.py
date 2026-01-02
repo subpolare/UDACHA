@@ -24,6 +24,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--matrix', type = str, default = 'king_matrix.king')
     parser.add_argument('--threads', type = int, default = 1)
+    parser.add_argument('--outpath', type = str, default = './clustering')
     parser.add_argument('--cutoff-min', type = float, default = 0.0)
     parser.add_argument('--cutoff-max', type = float, default = 0.6)
     parser.add_argument('--cutoff-step', type = float, default = 0.02)
@@ -31,6 +32,9 @@ def main():
     args = parser.parse_args()
 
     matrix_path = Path(args.matrix)
+    outpath = Path(args.outpath)
+    outpath.mkdir(parents = True, exist_ok = True)
+
     mat = np.loadtxt(matrix_path, dtype = np.float32)
     mat = np.nan_to_num(mat, nan = 0.0, posinf = 0.0, neginf = 0.0)
 
@@ -48,14 +52,19 @@ def main():
     xs = np.array([r[0] for r in results], dtype = float)
     ys = np.array([r[1] for r in results], dtype = int)
 
-    for x, y in results:
-        print(f'{x}\t{y}')
+    tsv_path = outpath / 'cutoff_vs_clusters.tsv'
+    with open(tsv_path, 'w') as f:
+        f.write('zero_cutoff\tclusters\n')
+        for x, y in results:
+            f.write(f'{x}\t{y}\n')
 
     plt.style.use('ggplot')
     plt.figure(figsize = (18, 9))
     plt.plot(xs, ys)
     plt.xlabel('Zeroing cutoff for KING matrix (mat[mat < cutoff] = 0)')
     plt.ylabel(f'Number of clusters at dendrogram cutoff {args.cluster_cutoff}')
+    plt.tight_layout()
+    plt.savefig(outpath / 'cutoff_vs_clusters.png', dpi = 200)
     plt.show()
 
 
