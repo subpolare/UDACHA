@@ -26,8 +26,8 @@ def main():
     parser.add_argument('--threads', type = int, default = 1)
     parser.add_argument('--outpath', type = str, default = './clustering')
     parser.add_argument('--cutoff-min', type = float, default = 0.0)
-    parser.add_argument('--cutoff-max', type = float, default = 0.6)
-    parser.add_argument('--cutoff-step', type = float, default = 0.02)
+    parser.add_argument('--cutoff-max', type = float, default = 0.8)
+    parser.add_argument('--cutoff-step', type = float, default = 0.05)
     parser.add_argument('--cluster-cutoff', type = float, default = 0.1)
     args = parser.parse_args()
 
