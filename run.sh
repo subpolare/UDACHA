@@ -58,6 +58,11 @@ python3 ${scripts}/clustering/clustering.py \
   --meta-file  ${home}/clustering/samples.meta.tsv \
   --outpath    ${home}/clustering
 
+python3 ${scripts}/clustering/plink2_cutoff_analyser.py \
+  --matrix  ${home}/clustering/king_all.king \
+  --outpath ${home}/clustering
+  --threads $threads
+
 python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
   --work     ${home}
