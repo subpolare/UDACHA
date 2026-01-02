@@ -40,8 +40,8 @@ def main(input_matrix, input_matrix_ids, meta_path, outpath):
     metadata.rename(columns={'genotype_cluster': 'indiv_id'}, inplace=True)
     metadata['indiv_id'] = 'INDIV_' + metadata['indiv_id'].astype(str).str.zfill(4)
     metadata.to_csv(new_meta_path, header=True, index=False, sep='\t')
-    visualizations_path = os.path.join(outpath, 'clustering')
-    visualize_clustering(mat, linkage, out_path=visualizations_path)
+    # visualizations_path = os.path.join(outpath, 'clustering')
+    # visualize_clustering(mat, linkage, out_path=visualizations_path)
 
 
 if __name__ == '__main__':
