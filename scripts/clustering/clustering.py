@@ -34,7 +34,7 @@ def main(input_matrix, input_matrix_ids, meta_path, outpath):
         by='genotype_cluster')
     
     metadata = pd.read_table(meta_path, header=0, dtype={'indiv_id': str})
-    #metadata = metadata.rename(columns={'indiv_id': 'ds_number'})
+    # metadata = metadata.rename(columns={'indiv_id': 'ds_number'})
     metadata = metadata.merge(clusters, on='indiv_id').sort_values(by='genotype_cluster')
     metadata.rename(columns={'indiv_id': 'old_indiv_id'}, inplace=True)
     metadata.rename(columns={'genotype_cluster': 'indiv_id'}, inplace=True)
