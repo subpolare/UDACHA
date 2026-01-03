@@ -1,11 +1,12 @@
-import argparse
-from curses import meta
-import os
+import os, argparse
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.cluster import hierarchy
+from curses import meta
 import matplotlib.pyplot as plt
+from scipy.cluster import hierarchy
+from sklearn.metrics import silhouette_samples
+plt.style.use('ggplot')
 
 
 def visualize_clustering(mat, linkage, out_path):
@@ -21,6 +22,34 @@ def visualize_clustering(mat, linkage, out_path):
     plt.close(fig)
 
 
+def visualize_silhouette(sim_mat, labels, out_dir):
+    labels = np.asarray(labels)
+    uniq = np.unique(labels)
+
+    if uniq.size < 2 or uniq.size >= labels.size:
+        return
+
+    dist = sim_mat.to_numpy(copy=False).astype(np.float32, copy=False)
+    max_sim = float(np.nanmax(dist))
+    dist[:] = max_sim - dist
+    dist[dist < 0] = 0.0
+    np.fill_diagonal(dist, 0.0)
+
+    s = silhouette_samples(dist, labels, metric='precomputed')
+    order = np.argsort(-s)
+    s_sorted = s[order]
+
+    fig = plt.figure(figsize=(18, 6))
+    plt.plot(np.arange(s_sorted.shape[0]), s_sorted)
+    plt.xlabel('Samples (sorted by silhouette score, desc)')
+    plt.ylabel('Silhouette score')
+    plt.tight_layout()
+
+    out_file = os.path.join(out_dir, 'silhoette-score.png')
+    plt.savefig(out_file, dpi=200)
+    plt.close(fig)
+
+
 def main(input_matrix, input_matrix_ids, meta_path, outpath):
     new_meta_path = os.path.join(outpath, "metadata.clustered.tsv") 
     indivs = np.loadtxt(input_matrix_ids, skiprows=0, dtype=str)
@@ -30,6 +59,7 @@ def main(input_matrix, input_matrix_ids, meta_path, outpath):
     mat[np.isnan(mat)] = 0
     linkage = hierarchy.linkage(mat, method='complete', metric='correlation')
     cl = hierarchy.fcluster(linkage, 0.1, criterion='distance')
+	visualize_silhouette(mat, cl, outpath)
     clusters = pd.DataFrame({'indiv_id': mat.index, 'genotype_cluster': cl}).sort_values(
         by='genotype_cluster')
     
