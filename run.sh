@@ -39,7 +39,7 @@ done < ${home}/clustering/vcfs.list
 bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/clustering/vcfs.list 
 bcftools index --threads $threads -f ${home}/VCFs/merged.without_MAF.vcf.gz 
 
-bcftools view --threads $threads -S <(bcftools stats --threads 50 -s - ${home}/VCFs/merged.without_MAF.vcf.gz \
+bcftools view --threads $threads -S <(bcftools stats --threads $threads -s - ${home}/VCFs/merged.without_MAF.vcf.gz \
   | awk -F '\t' '$1 == "PSC" { c = $3 + $4 + $5; if (c >= 1000) print $2 }') \
   -Oz -o ${home}/VCFs/merged.min1000.vcf.gz merged.without_MAF.vcf.gz
 bcftools index --threads $threads -f ${home}/VCFs/merged.min1000.vcf.gz
