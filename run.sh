@@ -37,7 +37,12 @@ while IFS= read -r f; do
 done < ${home}/clustering/vcfs.list
 
 bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/clustering/vcfs.list 
-bcftools index -f ${home}/VCFs/merged.without_MAF.vcf.gz --threads $threads
+bcftools index --threads $threads -f ${home}/VCFs/merged.without_MAF.vcf.gz 
+
+bcftools view --threads $threads -S <(bcftools stats --threads 50 -s - ${home}/VCFs/merged.without_MAF.vcf.gz \
+  | awk -F '\t' '$1 == "PSC" { c = $3 + $4 + $5; if (c >= 1000) print $2 }') \
+  -Oz -o ${home}/VCFs/merged.min1000.vcf.gz merged.without_MAF.vcf.gz
+bcftools index --threads $threads -f ${home}/VCFs/merged.min1000.vcf.gz
 
 # If there is an duplicate error in bcftools merge, use command below to find duplicates: 
 # for f in ${home}/VCFs/*.without_MAF.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
