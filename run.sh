@@ -36,13 +36,10 @@ while IFS= read -r f; do
     printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/clustering/samples.meta.tsv
 done < ${home}/clustering/vcfs.list
 
+# TO DO: LISTS WITH MIN100 & MIN1000 FOR MERGING 
+
 bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/clustering/vcfs.list 
 bcftools index --threads $threads -f ${home}/VCFs/merged.without_MAF.vcf.gz 
-
-bcftools view --threads $threads -S <(bcftools stats --threads $threads -s - ${home}/VCFs/merged.without_MAF.vcf.gz \
-  | awk -F '\t' '$1 == "PSC" { if ($5 >= 100) print $2 }') \
-  -Oz -o ${home}/VCFs/merged.min1000.vcf.gz merged.without_MAF.vcf.gz
-bcftools index --threads $threads -f ${home}/VCFs/merged.min1000.vcf.gz
 
 # If there is an duplicate error in bcftools merge, use command below to find duplicates: 
 # for f in ${home}/VCFs/*.without_MAF.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
