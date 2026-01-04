@@ -36,10 +36,32 @@ while IFS= read -r f; do
     printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/clustering/samples.meta.tsv
 done < ${home}/clustering/vcfs.list
 
-# TO DO: LISTS WITH MIN100 & MIN1000 FOR MERGING 
+find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merged*" -print0 \
+  | xargs -0 -n 1 -P "$threads" bash -c '
+      f="$1"
+      n="$(bcftools view --no-version -v snps -H "$f" 2>/dev/null | head -n 100 | wc -l || true)"
+      if [ "$n" -ge 100 ]; then
+        printf "%s\n" "$f"
+      fi
+    ' _ \
+  | LC_ALL=C sort -u > "$home/clustering/vcfs_min100.list"
+
+find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merged*" -print0 \
+  | xargs -0 -n 1 -P "$threads" bash -c '
+      f="$1"
+      n="$(bcftools view --no-version -v snps -H "$f" 2>/dev/null | head -n 1000 | wc -l || true)"
+      if [ "$n" -ge 1000 ]; then
+        printf "%s\n" "$f"
+      fi
+    ' _ \
+  | LC_ALL=C sort -u > "$home/clustering/vcfs_min1000.list"
 
 bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/clustering/vcfs.list 
+bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.min100.vcf.gz -l ${home}/clustering/vcfs_min100.list 
+bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.min1000.vcf.gz -l ${home}/clustering/vcfs_min1000.list
 bcftools index --threads $threads -f ${home}/VCFs/merged.without_MAF.vcf.gz 
+bcftools index --threads $threads -f ${home}/VCFs/merged.min1000.vcf.gz
+bcftools index --threads $threads -f ${home}/VCFs/merged.min100.vcf.gz
 
 # If there is an duplicate error in bcftools merge, use command below to find duplicates: 
 # for f in ${home}/VCFs/*.without_MAF.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
