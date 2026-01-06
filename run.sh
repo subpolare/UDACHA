@@ -26,7 +26,7 @@ find ${home}/VCFs -maxdepth 1 -type f -name "*.vcf.gz" ! -name "*.without_MAF.vc
         bcftools index --threads $threads -f "$out"
     done
 
-find ${home}/VCFs -type f -name "*.without_MAF.vcf.gz" | sort > ${home}/clustering/vcfs.list
+find ${home}/VCFs -type f -name "*.without_MAF.vcf.gz" | sort > ${home}/clustering/merged.list
 echo -e "indiv_id\ttf\tcell\talgn_id\tgse\tpath" > ${home}/clustering/samples.meta.tsv
 while IFS= read -r f; do
     b=$(basename "$f")
@@ -34,34 +34,31 @@ while IFS= read -r f; do
     IFS=_ read -r tf cell fileid gse <<< "$base"
     sid=$(bcftools query -l "$f")
     printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/clustering/samples.meta.tsv
-done < ${home}/clustering/vcfs.list
+done < ${home}/clustering/merged.list
 
-find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merged*" -print0 \
-  | xargs -0 -n 1 -P "$threads" bash -c '
-      f="$1"
-      n="$(bcftools view --no-version -v snps -H "$f" 2>/dev/null | head -n 100 | wc -l || true)"
-      if [ "$n" -ge 100 ]; then
-        printf "%s\n" "$f"
-      fi
-    ' _ \
-  | LC_ALL=C sort -u > "$home/clustering/vcfs_min100.list"
+for cutoff in '100' '1000'; do 
+    find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merged*" -print0 \
+      | xargs -0 -n 1 -P "$threads" bash -c '
+          f="$1"
+          n="$(bcftools view --no-version -v snps -H "$f" 2>/dev/null | head -n "$cutoff" | wc -l || true)"
+          if [ "$n" -ge "$cutoff" ]; then
+            printf "%s\n" "$f"
+          fi
+        ' _ \
+      | LC_ALL=C sort -u > ${home}/clustering/merged.min${cutoff}.list
+done
 
-find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merged*" -print0 \
-  | xargs -0 -n 1 -P "$threads" bash -c '
-      f="$1"
-      n="$(bcftools view --no-version -v snps -H "$f" 2>/dev/null | head -n 1000 | wc -l || true)"
-      if [ "$n" -ge 1000 ]; then
-        printf "%s\n" "$f"
-      fi
-    ' _ \
-  | LC_ALL=C sort -u > "$home/clustering/vcfs_min1000.list"
+# bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.vcf.gz -l ${home}/clustering/vcfs.list 
+# bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.min100.vcf.gz -l ${home}/clustering/vcfs_min100.list 
+# bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.min1000.vcf.gz -l ${home}/clustering/vcfs_min1000.list
+# bcftools index --threads $threads -f ${home}/VCFs/merged.vcf.gz 
+# bcftools index --threads $threads -f ${home}/VCFs/merged.min1000.vcf.gz
+# bcftools index --threads $threads -f ${home}/VCFs/merged.min100.vcf.gz
 
-bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.without_MAF.vcf.gz -l ${home}/clustering/vcfs.list 
-bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.min100.vcf.gz -l ${home}/clustering/vcfs_min100.list 
-bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.min1000.vcf.gz -l ${home}/clustering/vcfs_min1000.list
-bcftools index --threads $threads -f ${home}/VCFs/merged.without_MAF.vcf.gz 
-bcftools index --threads $threads -f ${home}/VCFs/merged.min1000.vcf.gz
-bcftools index --threads $threads -f ${home}/VCFs/merged.min100.vcf.gz
+for merged in 'merged' 'merged.min100' 'merged.min1000'; do
+    bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/${merged}.vcf.gz -l ${home}/clustering/${merged}.list 
+    bcftools index --threads $threads -f ${home}/VCFs/${merged}.vcf.gz 
+done 
 
 # If there is an duplicate error in bcftools merge, use command below to find duplicates: 
 # for f in ${home}/VCFs/*.without_MAF.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
@@ -69,7 +66,7 @@ bcftools index --threads $threads -f ${home}/VCFs/merged.min100.vcf.gz
 
 # 2. Clustering using PLINK2
 
-plink2 --vcf ${home}/VCFs/merged.without_MAF.vcf.gz \
+plink2 --vcf ${home}/VCFs/merged.vcf.gz \
   --allow-extra-chr \
   --threads $threads \
   --make-king square \    # for main pipeline
