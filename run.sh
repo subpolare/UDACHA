@@ -36,53 +36,59 @@ while IFS= read -r f; do
     printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$tf" "$cell" "$fileid" "$gse" "$f" >> ${home}/clustering/samples.meta.tsv
 done < ${home}/clustering/merged.list
 
-for cutoff in '100' '1000'; do 
-    find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merged*" -print0 \
-      | xargs -0 -n 1 -P "$threads" bash -c '
-          f="$1"
-          n="$(bcftools view --no-version -v snps -H "$f" 2>/dev/null | head -n "$cutoff" | wc -l || true)"
-          if [ "$n" -ge "$cutoff" ]; then
+find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merged*" -print0 \
+    | xargs -0 -n 1 -P "$threads" bash -c '
+        f="$1"
+        n="$(bcftools view --no-version -v snps -H "$f" 2>/dev/null | head -n 100 | wc -l || true)"
+        if [ "$n" -ge "$cutoff" ]; then
             printf "%s\n" "$f"
-          fi
-        ' _ \
-      | LC_ALL=C sort -u > ${home}/clustering/merged.min${cutoff}.list
-done
+        fi
+      ' _ \
+    | LC_ALL=C sort -u > ${home}/clustering/merged.min100.list
 
-# bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.vcf.gz -l ${home}/clustering/vcfs.list 
-# bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.min100.vcf.gz -l ${home}/clustering/vcfs_min100.list 
-# bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/merged.min1000.vcf.gz -l ${home}/clustering/vcfs_min1000.list
-# bcftools index --threads $threads -f ${home}/VCFs/merged.vcf.gz 
-# bcftools index --threads $threads -f ${home}/VCFs/merged.min1000.vcf.gz
-# bcftools index --threads $threads -f ${home}/VCFs/merged.min100.vcf.gz
-
-for merged in 'merged' 'merged.min100' 'merged.min1000'; do
-    bcftools merge -m none --threads $threads --missing-to-ref -Oz -o ${home}/VCFs/${merged}.vcf.gz -l ${home}/clustering/${merged}.list 
-    bcftools index --threads $threads -f ${home}/VCFs/${merged}.vcf.gz 
-done 
+bcftools merge -l ${home}/clustering/merged.min100.list \   # leave samples with at least 100 SNPs 
+    --missing-to-ref \   # because plink2 does not work with ./. in VCF
+    -Oz -o ${home}/VCFs/merged.min100.vcf.gz \ 
+    --threads $threads \
+    -m none 
 
 # If there is an duplicate error in bcftools merge, use command below to find duplicates: 
 # for f in ${home}/VCFs/*.without_MAF.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
 # of all the duplicates, only one should be left 
 
-# 2. Clustering using PLINK2
+bcftools index --threads $threads -f ${home}/VCFs/merged.min100.vcf.gz
 
-plink2 --vcf ${home}/VCFs/merged.vcf.gz \
+# 2. Clustering using PLINK2 and ... 
+
+plink2 --vcf ${home}/VCFs/merged.min100.vcf.gz \
   --allow-extra-chr \
   --threads $threads \
   --make-king square \    # for main pipeline
   # --make-king-table \   # for debugging and results analyzing
-  --out ${home}/clustering/king_all
+  --out ${home}/clustering/king_min100
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 python3 ${scripts}/clustering/clustering.py \
-  --matrix     ${home}/clustering/king_all.king \
-  --matrix-ids ${home}/clustering/king_all.king.id \
+  --matrix     ${home}/clustering/king_min100.king \
+  --matrix-ids ${home}/clustering/king_min100.king.id \
   --meta-file  ${home}/clustering/samples.meta.tsv \
   --outpath    ${home}/clustering
-
-python3 ${scripts}/clustering/plink2_cutoff_analyser.py \
-  --matrix  ${home}/clustering/king_all.king \
-  --outpath ${home}/clustering
-  --threads $threads
 
 python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
