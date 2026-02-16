@@ -67,28 +67,26 @@ plink2 --vcf ${home}/VCFs/merged.min100.vcf.gz \
   # --make-king-table \   # for debugging and results analyzing
   --out ${home}/clustering/king_min100
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 python3 ${scripts}/clustering/clustering.py \
-  --matrix     ${home}/clustering/king_min100.king \
-  --matrix-ids ${home}/clustering/king_min100.king.id \
-  --meta-file  ${home}/clustering/samples.meta.tsv \
-  --outpath    ${home}/clustering
+  --king ${home}/clustering/king_min100.king \
+  --king-id ${home}/clustering/king_min100.king.id \
+  --meta ${home}/clustering/samples.meta.tsv \
+  --out ${home}/clustering/metadata.clustered.tsv \
+  --floor 0.1 \
+  --thr 0.8 \
+  --method average
+
+
+
+
+
+
+
+
+
+
+
+
 
 python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
