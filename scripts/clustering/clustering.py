@@ -135,6 +135,8 @@ def main() -> None:
     out["indiv_id"] = indiv.loc[ids].to_numpy()
 
     out = out[["old_indiv_id", "tf", "cell", "algn_id", "gse", "path", "indiv_id"]]
+    out = out.reset_index(drop = True)
+    out = out.sort_values(['indiv_id', 'algn_id'], kind = 'mergesort').reset_index(drop = True)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(args.out, sep="\t", index=False)
