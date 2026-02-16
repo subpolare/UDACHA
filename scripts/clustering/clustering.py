@@ -100,6 +100,34 @@ def labels_to_indiv_ids(ids: list[str], labels: np.ndarray) -> pd.Series:
     return pd.Series(indiv, index=ids, name="indiv_id")
 
 
+def split_multicell_clusters(
+    out: pd.DataFrame,
+    *,
+    cluster_col: str = "indiv_id",
+    cell_col: str = "cell",
+    sep: str = "__CELL_",
+) -> pd.DataFrame:
+    out2 = out.copy()
+
+    if cluster_col not in out2.columns:
+        raise KeyError(f"{cluster_col} is missing in output dataframe")
+    if cell_col not in out2.columns:
+        raise KeyError(f"{cell_col} is missing in output dataframe")
+
+    n_cells = out2.groupby(cluster_col, dropna = False)[cell_col].nunique()
+    multicell = set(n_cells[n_cells > 1].index.astype(str).tolist())
+
+    if not multicell:
+        return out2
+
+    out2[cluster_col] = out2[cluster_col].astype(str)
+
+    mask = out2[cluster_col].isin(multicell)
+    out2.loc[mask, cluster_col] = out2.loc[mask, cluster_col] + sep + out2.loc[mask, cell_col].astype(str)
+
+    return out2
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--king", type=Path, required=True)
@@ -110,6 +138,12 @@ def main() -> None:
     p.add_argument("--floor", type=float, default=0.1)
     p.add_argument("--thr", type=float, default=0.8)
     p.add_argument("--method", type=str, default="average")
+
+    p.add_argument(
+        "--with-multicell-clusters",
+        action = "store_true",
+        help = "Do not split clusters that contain multiple cell lines; keep multicell clusters as-is"
+    )
 
     args = p.parse_args()
 
@@ -136,8 +170,11 @@ def main() -> None:
 
     out = out[["old_indiv_id", "tf", "cell", "algn_id", "gse", "path", "indiv_id"]]
     out = out.reset_index(drop = True)
-    out = out.sort_values(['indiv_id', 'algn_id'], kind = 'mergesort').reset_index(drop = True)
 
+    if not args.with_multicell_clusters:
+        out = split_multicell_clusters(out, cluster_col = "indiv_id", cell_col = "cell")
+
+    out = out.sort_values(['indiv_id', 'algn_id'], kind = 'mergesort').reset_index(drop = True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(args.out, sep="\t", index=False)
 
