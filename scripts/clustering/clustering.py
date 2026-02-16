@@ -1,93 +1,144 @@
-import os, argparse
+from __future__ import annotations
+
+import argparse
+import re
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from curses import meta
-import matplotlib.pyplot as plt
 from scipy.cluster import hierarchy
-from sklearn.metrics import silhouette_samples
-plt.style.use('ggplot')
+from scipy.spatial.distance import squareform
 
 
-def visualize_clustering(mat, linkage, out_path):
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 10))
-    dendro = hierarchy.dendrogram(linkage, no_plot=False, ax=ax1)
-    g = sns.heatmap(mat.iloc[dendro['leaves'],dendro['leaves']], cmap='Blues',
-     square=True, xticklabels=False, yticklabels=False, cbar=False, ax=ax2)
-    for l in ['left','right','top','bottom']:
-        g.spines[l].set_visible(True)
-        g.spines[l].set_color('k')
-    
-    plt.savefig(f"{out_path}.png")
-    plt.close(fig)
+def read_king_ids(path: Path) -> list[str]:
+    ids = []
+    with open(path, "rt") as f:
+        for line in f:
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            ids.append(re.split(r"\s+", s)[0])
+    if not ids:
+        raise ValueError(f"Empty KING id file: {path}")
+    return ids
 
 
-def visualize_silhouette(sim_mat, labels, out_dir):
-    labels = np.asarray(labels)
-    uniq = np.unique(labels)
+def read_king_matrix_square(path: Path, n: int) -> np.ndarray:
+    rows = []
+    with open(path, "rt") as f:
+        for line in f:
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            rows.append(np.fromstring(s, sep=" ", dtype=np.float32))
+    if len(rows) != n:
+        raise ValueError(f"KING rows mismatch: {len(rows)} != {n}")
+    mat = np.vstack(rows)
+    if mat.shape != (n, n):
+        raise ValueError(f"KING shape mismatch: {mat.shape} != {(n, n)}")
+    mat = (mat + mat.T) / 2.0
+    return mat
 
-    if uniq.size < 2 or uniq.size >= labels.size:
-        return
 
-    dist = sim_mat.to_numpy(copy=False).astype(np.float32, copy=False)
-    max_sim = float(np.nanmax(dist))
-    dist[:] = max_sim - dist
-    dist[dist < 0] = 0.0
+def load_meta(meta_path: Path) -> pd.DataFrame:
+    m = pd.read_csv(meta_path, sep="\t", dtype=str).fillna("NA")
+    need = ["indiv_id", "tf", "cell", "algn_id", "gse", "path"]
+    for c in need:
+        if c not in m.columns:
+            raise ValueError(f"meta must contain column: {c}")
+    m = m.drop_duplicates("indiv_id").set_index("indiv_id", drop=False)
+    return m
+
+
+def intersect(ids: list[str], kin: np.ndarray, meta: pd.DataFrame) -> tuple[list[str], np.ndarray, pd.DataFrame]:
+    meta_ids = set(meta.index.astype(str).tolist())
+    keep = np.array([i in meta_ids for i in ids], dtype=bool)
+    keep_n = int(keep.sum())
+    if keep_n < 2:
+        raise ValueError(f"Too few overlap samples: {keep_n}")
+    if keep_n == len(ids):
+        meta2 = meta.reindex(ids)
+        if int(meta2["indiv_id"].isna().sum()) > 0:
+            raise ValueError("Metadata missing for some KING IDs")
+        return ids, kin, meta2
+
+    idx = np.where(keep)[0]
+    ids2 = [ids[i] for i in idx.tolist()]
+    kin2 = kin[np.ix_(idx, idx)]
+    meta2 = meta.reindex(ids2)
+    if int(meta2["indiv_id"].isna().sum()) > 0:
+        raise ValueError("Metadata missing for some kept samples")
+    return ids2, kin2, meta2
+
+
+def apply_floor(kin: np.ndarray, floor: float) -> np.ndarray:
+    kin = kin.copy()
+    kin[kin < floor] = 0.0
+    kin = (kin + kin.T) / 2.0
+    return kin
+
+
+def kinship_to_distance(kin: np.ndarray) -> np.ndarray:
+    dist = 1.0 - 2.0 * kin
+    dist = (dist + dist.T) / 2.0
     np.fill_diagonal(dist, 0.0)
-
-    s = silhouette_samples(dist, labels, metric='precomputed')
-    order = np.argsort(-s)
-    s_sorted = s[order]
-
-    fig = plt.figure(figsize=(18, 6))
-    plt.plot(np.arange(s_sorted.shape[0]), s_sorted)
-    plt.xlabel('Samples (sorted by silhouette score, desc)')
-    plt.ylabel('Silhouette score')
-    plt.tight_layout()
-
-    out_file = os.path.join(out_dir, 'silhoette-score.png')
-    plt.savefig(out_file, dpi=200)
-    plt.close(fig)
+    dist[dist < 0] = 0.0
+    return dist.astype(np.float32, copy=False)
 
 
-def main(input_matrix, input_matrix_ids, meta_path, outpath):
-    new_meta_path = os.path.join(outpath, "metadata.clustered.tsv") 
-    indivs = np.loadtxt(input_matrix_ids, skiprows=0, dtype=str)
-    rel_mat = np.loadtxt(input_matrix)
-    mat = pd.DataFrame(rel_mat, index=indivs, columns=indivs)
-    mat[mat < 0.4] = 0
-    mat[np.isnan(mat)] = 0
-    linkage = hierarchy.linkage(mat, method='complete', metric='correlation')
-    cl = hierarchy.fcluster(linkage, 0.1, criterion='distance')
-	visualize_silhouette(mat, cl, outpath)
-    clusters = pd.DataFrame({'indiv_id': mat.index, 'genotype_cluster': cl}).sort_values(
-        by='genotype_cluster')
-    
-    metadata = pd.read_table(meta_path, header=0, dtype={'indiv_id': str})
-    # metadata = metadata.rename(columns={'indiv_id': 'ds_number'})
-    metadata = metadata.merge(clusters, on='indiv_id').sort_values(by='genotype_cluster')
-    metadata.rename(columns={'indiv_id': 'old_indiv_id'}, inplace=True)
-    metadata.rename(columns={'genotype_cluster': 'indiv_id'}, inplace=True)
-    metadata['indiv_id'] = 'INDIV_' + metadata['indiv_id'].astype(str).str.zfill(4)
-    metadata.to_csv(new_meta_path, header=True, index=False, sep='\t')
-    # visualizations_path = os.path.join(outpath, 'clustering')
-    # visualize_clustering(mat, linkage, out_path=visualizations_path)
+def labels_to_indiv_ids(ids: list[str], labels: np.ndarray) -> pd.Series:
+    df = pd.DataFrame({"old_indiv_id": ids, "lab": labels})
+    keys = (
+        df.groupby("lab")["old_indiv_id"]
+        .min()
+        .sort_values(kind="mergesort")
+        .index.to_list()
+    )
+    lab_to_rank = {lab: i + 1 for i, lab in enumerate(keys)}
+    ranks = df["lab"].map(lab_to_rank).astype(int).to_numpy()
+    indiv = np.array([f"INDIV_{r:04d}" for r in ranks], dtype=object)
+    return pd.Series(indiv, index=ids, name="indiv_id")
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Count tags by allele")
-    parser.add_argument("--matrix", type=str, help="Result of plink2 --king with suffix .king")
+def main() -> None:
+    p = argparse.ArgumentParser()
+    p.add_argument("--king", type=Path, required=True)
+    p.add_argument("--king-id", type=Path, required=True)
+    p.add_argument("--meta", type=Path, required=True)
+    p.add_argument("--out", type=Path, required=True)
 
-    parser.add_argument("--matrix-ids", type=str,
-						help="Result of plink2 --king with suffix .king.id")
+    p.add_argument("--floor", type=float, default=0.1)
+    p.add_argument("--thr", type=float, default=0.8)
+    p.add_argument("--method", type=str, default="average")
 
-    parser.add_argument("--meta-file", type=str, 
-						help="Path to meta file")
+    args = p.parse_args()
 
-    parser.add_argument("--outpath", type=str, 
-						help="Path to directory to save updated metafile and visualizations")
-    
+    ids = read_king_ids(args.king_id)
+    n = len(ids)
 
-    args = parser.parse_args()
+    meta = load_meta(args.meta)
+    kin = read_king_matrix_square(args.king, n=n)
 
-    main(args.matrix, args.matrix_ids, args.meta_file, args.outpath)
+    ids, kin, meta = intersect(ids, kin, meta)
+
+    kin = apply_floor(kin, floor=float(args.floor))
+    dist = kinship_to_distance(kin)
+
+    cond = squareform(dist, checks=False)
+    z = hierarchy.linkage(cond, method=str(args.method))
+
+    labels = hierarchy.fcluster(z, t=float(args.thr), criterion="distance")
+    indiv = labels_to_indiv_ids(ids, labels)
+
+    out = meta.loc[ids, ["indiv_id", "tf", "cell", "algn_id", "gse", "path"]].copy()
+    out = out.rename(columns={"indiv_id": "old_indiv_id"})
+    out["indiv_id"] = indiv.loc[ids].to_numpy()
+
+    out = out[["old_indiv_id", "tf", "cell", "algn_id", "gse", "path", "indiv_id"]]
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(args.out, sep="\t", index=False)
+
+
+if __name__ == "__main__":
+    main()
