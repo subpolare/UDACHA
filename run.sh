@@ -76,18 +76,6 @@ python3 ${scripts}/clustering/clustering.py \
   --thr 0.8 \
   --method average
 
-
-
-
-
-
-
-
-
-
-
-
-
 python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
   --work     ${home}
@@ -104,10 +92,9 @@ find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
 
 find ${home}/BEDs -maxdepth 1 -name 'INDIV_????.bed' -print0 | while IFS= read -r -d '' file; do
     name=$(basename $file .bed)
-    babachi ${home}/BEDs/${name}.bed -j 22 -O ${home}/BADs/ >/dev/null 2>&1
+    babachi ${home}/BEDs/${name}.bed -j 22 -p geometric -g 0.99 -s "1,4/3,3/2,2,5/2,3,4,5,6" -O ${home}/BADs/ >/dev/null 2>&1
 
     if [ "$(wc -l < "${home}/BADs/${name}.badmap.bed")" -gt 1 ]; then
-        echo ${home}/BADs/${name}.badmap.bed
         babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
         python3 ${scripts}/babachi/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
         rm ${home}/BADs/${name}.badmap.visualization/*.svg
@@ -116,10 +103,22 @@ find ${home}/BEDs -maxdepth 1 -name 'INDIV_????.bed' -print0 | while IFS= read -
         --bed    ${home}/BEDs/${name}.bed \
         --bad    ${home}/BADs/${name}.badmap.bed \
         --output ${home}/BEDs/${name}.with_bad.bed
-    rm ${home}/BEDs/${name}.bed
 done 
 
 # 4. Create lists of the TFs and cell lines 
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/factors.list
 while read tf; do
