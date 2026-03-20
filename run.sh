@@ -48,7 +48,7 @@ find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merg
     | LC_ALL=C sort -u > ${home}/clustering/merged.min100.list
 
 bcftools merge -l ${home}/clustering/merged.min100.list \   # leave samples with at least 100 SNPs 
-    --missing-to-ref \   # because plink2 does not work with ./. in VCF
+    --missing-to-ref \                                      # because plink2 does not work with ./. in VCF
     -Oz -o ${home}/VCFs/merged.min100.vcf.gz \ 
     --threads $threads \
     -m none 
@@ -108,7 +108,6 @@ done
 # 4. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html
 
 project=${home}/mixalime/common_${mixalime_model}
-
 python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
 python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $mixalime_model
 python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
