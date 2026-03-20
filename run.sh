@@ -1,5 +1,6 @@
 home='/sandbox/subpolare/adastra'
 scripts='/home/subpolare/adastra-v7/scripts'
+mixalime_model='NB'
 threads=100
 
 # DO NOT EDIT BELOW
@@ -90,14 +91,13 @@ find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
 
 # 3. BABACHI, https://github.com/autosome-ru/BABACHI 
 
-find ${home}/BEDs -maxdepth 1 -name 'INDIV_????.bed' -print0 | while IFS= read -r -d '' file; do
+find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.bed' -print0 | while IFS= read -r -d '' file; do
     name=$(basename $file .bed)
-    babachi ${home}/BEDs/${name}.bed -j 22 -p geometric -g 0.99 -s "1,4/3,3/2,2,5/2,3,4,5,6" -O ${home}/BADs/ >/dev/null 2>&1
-
+    babachi ${home}/BEDs/${name}.bed -j 25 -p geometric -g 0.99 -s "1,4/3,3/2,2,5/2,3,4,5,6" -O ${home}/BADs/
     if [ "$(wc -l < "${home}/BADs/${name}.badmap.bed")" -gt 1 ]; then
         babachi visualize ${home}/BEDs/${name}.bed -O ${home}/BADs/ -b ${home}/BADs/${name}.badmap.bed
-        python3 ${scripts}/babachi/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
-        rm ${home}/BADs/${name}.badmap.visualization/*.svg
+        # python3 ${scripts}/babachi/svg2png.py -d ${home}/BADs/${name}.badmap.visualization
+        # rm ${home}/BADs/${name}.badmap.visualization/*.svg
     fi    
     python3 ${scripts}/babachi/add_bad_to_bed.py \
         --bed    ${home}/BEDs/${name}.bed \
@@ -105,20 +105,36 @@ find ${home}/BEDs -maxdepth 1 -name 'INDIV_????.bed' -print0 | while IFS= read -
         --output ${home}/BEDs/${name}.with_bad.bed
 done 
 
+# 4. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html
+
+project=${home}/mixalime/common_${mixalime_model}
+
+python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
+python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $mixalime_model
+python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
+python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
+python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
+python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 4. Create lists of the TFs and cell lines 
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/factors.list
 while read tf; do
@@ -175,8 +191,6 @@ done
 
 
 
-
-# NOT UPDATED || OLD VERSION
 
 # 4. Creating tables for TFs
 
