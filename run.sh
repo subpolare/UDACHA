@@ -77,11 +77,7 @@ python3 ${scripts}/clustering/clustering.py \
   --thr 0.8 \
   --method average
 
-python3 ${scripts}/clustering/get_pooled_from_geo.py \
-    --input-tsv ${home}/clustering/metadata.clustered.tsv \
-    --output-tsv ${home}/clustering/metadata.clustered.with_gse.tsv \
-    --cache-json ${home}/clustering/gse_api_cache.json \
-    --resume
+python3 ${scripts}/clustering/get_pooled_from_geo.py 
 
 python3 ${scripts}/clustering/split_into_pooled.py \
     --input-tsv ${home}clustering/metadata.clustered.with_gse.tsv \
