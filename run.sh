@@ -77,6 +77,17 @@ python3 ${scripts}/clustering/clustering.py \
   --thr 0.8 \
   --method average
 
+python3 ${scripts}/clustering/get_pooled_from_geo.py \
+    --input-tsv ${home}/clustering/metadata.clustered.tsv \
+    --output-tsv ${home}/clustering/metadata.clustered.with_gse.tsv \
+    --cache-json ${home}/clustering/gse_api_cache.json \
+    --resume
+
+python3 ${scripts}/clustering/split_into_pooled.py \
+    --input-tsv ${home}clustering/metadata.clustered.with_gse.tsv \
+    --output-not-pooled-tsv ${home}/clustering/metadata.clustered.not_pooled.tsv \
+    --output-pooled-tsv ${home}/clustering/metadata.clustered.pooled.tsv
+
 python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
   --work     ${home}
@@ -105,19 +116,86 @@ find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.bed' -print0 | while IFS= read -r -
         --output ${home}/BEDs/${name}.with_bad.bed
 done 
 
-# 4. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html
+# Find BADs with 500 000 SNPs at least and others 
 
-project=${home}/mixalime/common_${mixalime_model}
-python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
-python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $mixalime_model
+find ${home}/BADs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
+    | xargs -0 -I{} bash -c 'n=$(($(wc -l < "$1") - 1)); [ "$n" -gt 500000 ] && basename "$1" .with_bad.bed' _ {} \
+    | sort > ${home}/mixalime/halfmillions.txt
+
+find ${home}/BADs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
+    | xargs -0 -I{} basename {} .with_bad.bed \
+    | sort | grep -Fvx -f ${home}/mixalime/halfmillions.txt \
+    > ${home}/mixalime/not_halfmillions.txt
+
+awk -F '/' '{print $NF}' ${home}/mixalime/filtered_list.txt \
+    | sed 's/\.with_bad\.bed$//' \
+    | sort -u > ${home}/mixalime/filtered_indivs.txt
+
+grep -Fxf ${home}/mixalime/filtered_indivs.txt ${home}/mixalime/halfmillions.txt \
+    | sort -u > ${home}/mixalime/halfmillions.filtered.txt
+
+grep -Fxf ${home}/mixalime/filtered_indivs.txt ${home}/mixalime/not_halfmillions.txt \
+    | sort -u > ${home}/mixalime/not_halfmillions.filtered.txt
+
+# 4. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html 
+
+while IFS= read -r indiv_id; do
+    mkdir -p ${home}/mixalime/${indiv_id} 
+    project=${home}/mixalime/${indiv_id}/${indiv_id}
+    python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BADs/${indiv_id}.with_bad.bed --no-snp-bad-check --max-cover 10000 
+    python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
+    python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
+    python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
+    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
+    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
+done < ${home}/mixalime/halfmillions.filtered.txt
+
+mkdir -p ${home}/mixalime/less_than_500K_SNPs
+project=${home}/mixalime/${indiv_id}/${indiv_id}
+files=$(awk -v home="${home}" '{print home "/BADs/" $0 ".with_bad.bed"}' "${home}/mixalime/not_halfmillions.filtered.txt")
+python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${files} --no-snp-bad-check --max-cover 10000 
+python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
 python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
 python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
 python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
 python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
 
+mkdir -p ${home}/mixalime/pooled
+project=${home}/mixalime/pooled/pooled
+awk -F '\t' '
+NR == 1 {
+    for (i = 1; i <= NF; i++) {
+        if ($i == "indiv_id") c = i
+    }
+    next
+}
+c && $c != "" {
+    print "/sandbox/subpolare/adastra/BADs/" $c ".with_bad.bed"
+}
+' ${home}/clustering/metadata.clustered.pooled.tsv | sort -u | xargs python3 ${scripts}/mixalime/limiter.py --threads $threads create $project --no-snp-bad-check --max-cover 10000 
+python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project BetaNB
+python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
+python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
+python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
+python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
 
+# MixALiMe combine 
 
+cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/factors.list
+while read tf; do
+    awk -F'\t' -v tf="$tf" 'NR > 1 && $2 == tf { print $7 }' ${home}/clustering/metadata.clustered.tsv \
+        | sort -u \
+        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
+        > ${home}/mixalime/groups/factors_"$tf".list
+done < ${home}/mixalime/groups/factors.list
 
+cut -f3 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/cell.list
+while read cell; do
+    awk -F'\t' -v cell="$cell" 'NR > 1 && $3 == cell { print $7 }' ${home}/clustering/metadata.clustered.tsv \
+        | sort -u \
+        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
+        > ${home}/mixalime/groups/cell_${cell}.list
+done < ${home}/mixalime/groups/cell.list
 
 
 
