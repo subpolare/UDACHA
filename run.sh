@@ -198,37 +198,9 @@ done < ${home}/mixalime/groups/cell.list
 
 
 
-# 4. Create lists of the TFs and cell lines 
 
-cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/factors.list
-while read tf; do
-    awk -F'\t' -v tf="$tf" 'NR > 1 && $2 == tf { print $7 }' ${home}/clustering/metadata.clustered.tsv \
-        | sort -u \
-        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
-        > ${home}/mixalime/groups/factors_"$tf".list
-done < ${home}/mixalime/groups/factors.list
 
-cut -f3 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/cell.list
-while read cell; do
-    awk -F'\t' -v cell="$cell" 'NR > 1 && $3 == cell { print $7 }' ${home}/clustering/metadata.clustered.tsv \
-        | sort -u \
-        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
-        > ${home}/mixalime/groups/cell_${cell}.list
-done < ${home}/mixalime/groups/cell.list
-
-# 5. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html
-
-for model in MCNB NB BetaNB; do
-    project=${home}/mixalime/${model}
-    export project
-    export model 
-
-    python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/*.with_bad.bed --no-snp-bad-check
-    python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project $model
-    python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
-
-    python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
-
+for model in MCNB NB BetaNB; 
     echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_factors.txt 
     while read -r tf; do
         echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $tf >> ${home}/logs/status_factors.txt
@@ -246,9 +218,6 @@ for model in MCNB NB BetaNB; do
             --group ${home}/mixalime/groups/cell_${cell}.list \
             ${project}
     done < ${home}/mixalime/groups/cell.list
-
-    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project ${home}/mixalime/results_${model}
-    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project ${home}/mixalime/results_${model}
 done
 
 
