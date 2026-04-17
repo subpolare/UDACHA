@@ -158,17 +158,8 @@ python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $pro
 
 mkdir -p ${home}/mixalime/pooled
 project=${home}/mixalime/pooled/pooled
-awk -F '\t' '
-NR == 1 {
-    for (i = 1; i <= NF; i++) {
-        if ($i == "indiv_id") c = i
-    }
-    next
-}
-c && $c != "" {
-    print "/sandbox/subpolare/adastra/BADs/" $c ".with_bad.bed"
-}
-' ${home}/clustering/metadata.clustered.pooled.tsv | sort -u | xargs python3 ${scripts}/mixalime/limiter.py --threads $threads create $project --no-snp-bad-check --max-cover 10000 
+awk -F'\t' 'NR==1 {for (i=1; i<=NF; i++) {if ($i=="indiv_id") c1=i; if ($i=="pooled") c2=i} next} $c2=="True" {print "/sandbox/subpolare/adastra/BADs/" $c1 ".with_bad.bed"}
+' /sandbox/subpolare/adastra/clustering/GEO/metadata.clustered.pooled.tsv | sort -u | xargs python3 ${scripts}/mixalime/limiter.py --threads $threads create $project --no-snp-bad-check --max-cover 10000 
 python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project BetaNB
 python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
 python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
