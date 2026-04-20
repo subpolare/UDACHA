@@ -172,7 +172,7 @@ cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${hom
 while read tf; do
     awk -F'\t' -v tf="$tf" 'NR > 1 && $2 == tf { print $7 }' ${home}/clustering/metadata.clustered.tsv \
         | sort -u \
-        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
+        | awk -v home="$home" '{ printf "%s/BADs/%s.with_bad.bed\n", home, $1 }' \
         > ${home}/mixalime/groups/factors_"$tf".list
 done < ${home}/mixalime/groups/factors.list
 
@@ -180,7 +180,7 @@ cut -f3 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${hom
 while read cell; do
     awk -F'\t' -v cell="$cell" 'NR > 1 && $3 == cell { print $7 }' ${home}/clustering/metadata.clustered.tsv \
         | sort -u \
-        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\n", home, $1 }' \
+        | awk -v home="$home" '{ printf "%s/BADs/%s.with_bad.bed\n", home, $1 }' \
         > ${home}/mixalime/groups/cell_${cell}.list
 done < ${home}/mixalime/groups/cell.list
 
