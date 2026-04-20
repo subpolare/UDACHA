@@ -147,7 +147,7 @@ while IFS= read -r indiv_id; do
 done < ${home}/mixalime/halfmillions.filtered.txt
 
 mkdir -p ${home}/mixalime/less_than_500K_SNPs
-project=${home}/mixalime/${indiv_id}/${indiv_id}
+project=${home}/mixalime/less_than_500K_SNPs/less_than_500K_SNPs
 files=$(awk -v home="${home}" '{print home "/BADs/" $0 ".with_bad.bed"}' "${home}/mixalime/not_halfmillions.filtered.txt")
 python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${files} --no-snp-bad-check --max-cover 10000 
 python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
