@@ -77,12 +77,12 @@ python3 ${scripts}/clustering/clustering.py \
   --thr 0.8 \
   --method average
 
-python3 ${scripts}/clustering/get_pooled_from_geo.py 
+# python3 ${scripts}/clustering/get_pooled_from_geo.py 
 
-python3 ${scripts}/clustering/split_into_pooled.py \
-    --input-tsv ${home}clustering/metadata.clustered.with_gse.tsv \
-    --output-not-pooled-tsv ${home}/clustering/metadata.clustered.not_pooled.tsv \
-    --output-pooled-tsv ${home}/clustering/metadata.clustered.pooled.tsv
+# python3 ${scripts}/clustering/split_into_pooled.py \
+#     --input-tsv ${home}clustering/metadata.clustered.with_gse.tsv \
+#     --output-not-pooled-tsv ${home}/clustering/metadata.clustered.not_pooled.tsv \
+#     --output-pooled-tsv ${home}/clustering/metadata.clustered.pooled.tsv
 
 python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
@@ -114,26 +114,29 @@ done
 
 # Find BADs with 500 000 SNPs at least and others 
 
+mkdir -p ${home}/mixalime/file_lists/
+
 find ${home}/BADs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
     | xargs -0 -I{} bash -c 'n=$(($(wc -l < "$1") - 1)); [ "$n" -gt 500000 ] && basename "$1" .with_bad.bed' _ {} \
-    | sort > ${home}/mixalime/halfmillions.txt
+    | sort > ${home}/mixalime/file_lists/halfmillions.txt
 
 find ${home}/BADs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
     | xargs -0 -I{} basename {} .with_bad.bed \
-    | sort | grep -Fvx -f ${home}/mixalime/halfmillions.txt \
-    > ${home}/mixalime/not_halfmillions.txt
+    | sort | grep -Fvx -f ${home}/mixalime/file_lists/halfmillions.txt \
+    > ${home}/mixalime/file_lists/not_halfmillions.txt
 
-awk -F '/' '{print $NF}' ${home}/mixalime/filtered_list.txt \
-    | sed 's/\.with_bad\.bed$//' \
-    | sort -u > ${home}/mixalime/filtered_indivs.txt
+# filtered_list.txt is the list of files after filtration, format of exh string is /sandbox/subpolare/adastra/BADs_geometric_p0_99/INDIV_*.with_bad.bed 
+# (where /sandbox/subpolare/adastra/ is $home)
+awk -F '/' '{print $NF}' ${home}/mixalime/file_lists/filtered_list.txt \
+    | sed 's/\.with_bad\.bed$//' | sort -u > ${home}/mixalime/file_lists/filtered_indivs.txt
 
-grep -Fxf ${home}/mixalime/filtered_indivs.txt ${home}/mixalime/halfmillions.txt \
-    | sort -u > ${home}/mixalime/halfmillions.filtered.txt
+grep -Fxf ${home}/mixalime/file_lists/filtered_indivs.txt ${home}/mixalime/file_lists/halfmillions.txt \
+    | sort -u > ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
-grep -Fxf ${home}/mixalime/filtered_indivs.txt ${home}/mixalime/not_halfmillions.txt \
-    | sort -u > ${home}/mixalime/not_halfmillions.filtered.txt
+grep -Fxf ${home}/mixalime/file_lists/filtered_indivs.txt ${home}/mixalime/file_lists/not_halfmillions.txt \
+    | sort -u > ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
 
-# 4. MixALiMe, http://mixalime.georgy.top/tutorial/quickstart.html 
+# 4. MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
 
 while IFS= read -r indiv_id; do
     mkdir -p ${home}/mixalime/${indiv_id} 
@@ -144,11 +147,11 @@ while IFS= read -r indiv_id; do
     python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
     python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
-done < ${home}/mixalime/halfmillions.filtered.txt
+done < ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
 mkdir -p ${home}/mixalime/less_than_500K_SNPs
 project=${home}/mixalime/less_than_500K_SNPs/less_than_500K_SNPs
-files=$(awk -v home="${home}" '{print home "/BADs/" $0 ".with_bad.bed"}' "${home}/mixalime/not_halfmillions.filtered.txt")
+files=$(awk -v home="${home}" '{print home "/BADs/" $0 ".with_bad.bed"}' "${home}/mixalime/file_lists/not_halfmillions.filtered.txt")
 python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${files} --no-snp-bad-check --max-cover 10000 
 python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
 python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
@@ -156,36 +159,74 @@ python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
 python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
 python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
 
-mkdir -p ${home}/mixalime/pooled
-project=${home}/mixalime/pooled/pooled
-awk -F'\t' 'NR==1 {for (i=1; i<=NF; i++) {if ($i=="indiv_id") c1=i; if ($i=="pooled") c2=i} next} $c2=="True" {print "/sandbox/subpolare/adastra/BADs/" $c1 ".with_bad.bed"}
-' /sandbox/subpolare/adastra/clustering/GEO/metadata.clustered.pooled.tsv | sort -u | xargs python3 ${scripts}/mixalime/limiter.py --threads $threads create $project --no-snp-bad-check --max-cover 10000 
-python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project BetaNB
-python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
-python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
-python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
-python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
+# for pooled samples. But in new version we manually remove them before MixALiMe 
+# mkdir -p ${home}/mixalime/pooled
+# project=${home}/mixalime/pooled/pooled
+# awk -F'\t' 'NR==1 {for (i=1; i<=NF; i++) {if ($i=="indiv_id") c1=i; if ($i=="pooled") c2=i} next} $c2=="True" {print "/sandbox/subpolare/adastra/BADs/" $c1 ".with_bad.bed"}
+# ' /sandbox/subpolare/adastra/clustering/GEO/metadata.clustered.pooled.tsv | sort -u | xargs python3 ${scripts}/mixalime/limiter.py --threads $threads create $project --no-snp-bad-check --max-cover 10000 
+# python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project BetaNB
+# python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
+# python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
+# python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
+# python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
 
-# MixALiMe combine 
+# Prepare list of foles with different TFs and cell lines for MixALiMe combine 
 
-cut -f2 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/factors.list
-while read tf; do
-    awk -F'\t' -v tf="$tf" 'NR > 1 && $2 == tf { print $7 }' ${home}/clustering/metadata.clustered.tsv \
+filtered="${home}/mixalime/file_lists/filtered_list.txt"
+filtered_names="${home}/mixalime/file_lists/filtered_names.txt"
+
+awk -F/ '{print $NF}' "$filtered" | sort -u > "$filtered_names"
+cut -f2 "${home}/clustering/metadata.clustered.tsv" | tail -n +2 | sort -u > "${home}/mixalime/groups/factors.list"
+while read -r tf; do
+    awk -F'\t' -v tf="$tf" 'NR > 1 && $2 == tf { print $7 }' "${home}/clustering/metadata.clustered.tsv" \
         | sort -u \
-        | awk -v home="$home" '{ printf "%s/BADs/%s.with_bad.bed\n", home, $1 }' \
-        > ${home}/mixalime/groups/factors_"$tf".list
+        | awk -v home="$home" '{ printf "%s/BADs/%s.with_bad.bed\t%s.with_bad.bed\n", home, $1, $1 }' \
+        | awk -F'\t' 'NR==FNR { ok[$1]=1; next } $2 in ok { print $1 }' "$filtered_names" - \
+        > "${home}/mixalime/groups/factors_${tf}.list"
+done < "${home}/mixalime/groups/factors.list"
+
+cut -f3 "${home}/clustering/metadata.clustered.tsv" | tail -n +2 | sort -u > "${home}/mixalime/groups/cell.list"
+while read -r cell; do
+    awk -F'\t' -v cell="$cell" 'NR > 1 && $3 == cell { print $7 }' "${home}/clustering/metadata.clustered.tsv" \
+        | sort -u \
+        | awk -v home="$home" '{ printf "%s/BADs/%s.with_bad.bed\t%s.with_bad.bed\n", home, $1, $1 }' \
+        | awk -F'\t' 'NR==FNR { ok[$1]=1; next } $2 in ok { print $1 }' "$filtered_names" - \
+        > "${home}/mixalime/groups/cell_${cell}.list"
+done < "${home}/mixalime/groups/cell.list"
+
+# 4. MixALiMe combine
+
+mkdir -p ${home}/mixalime/multiple_combine
+
+echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME MULTIPLE_COMBINE FOR TFs > ${home}/logs/status_multiple_combine_factors.txt
+while read -r tf; do
+    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START ${tf} >> ${home}/logs/status_multiple_combine_factors.txt
+
+    projects=$(
+        awk -F/ '{print $NF}' ${home}/mixalime/groups/factors_${tf}.list \
+        | sed 's/\.with_bad\.bed$//' \
+        | while read -r indiv_id; do
+            if grep -Fxq "${indiv_id}" ${home}/mixalime/file_lists/halfmillions.filtered.txt; then
+                echo ${home}/mixalime/${indiv_id}/${indiv_id}
+            elif grep -Fxq "${indiv_id}" ${home}/mixalime/file_lists/not_halfmillions.filtered.txt; then
+                echo ${home}/mixalime/less_than_500K_SNPs/less_than_500K_SNPs
+            else
+                echo [WARNING] $(date '+%Y-%m-%d %H:%M:%S') ${tf} UNKNOWN_PROJECT ${indiv_id} >> ${home}/logs/status_multiple_combine_factors.txt
+            fi
+        done | sort -u
+    )
+
+    if [[ -n "${projects}" ]]; then
+        mixalime multiple_combine \
+            --n-jobs $threads \
+            --subname TF_${tf} \
+            --group ${home}/mixalime/groups/factors_${tf}.list \
+            ${home}/mixalime/multiple_combine/TF_${tf}/TF_${tf} \
+            ${projects}
+    else
+        echo [WARNING] $(date '+%Y-%m-%d %H:%M:%S') SKIP_EMPTY ${tf} >> ${home}/logs/status_multiple_combine_factors.txt
+    fi
 done < ${home}/mixalime/groups/factors.list
-
-cut -f3 ${home}/clustering/metadata.clustered.tsv | tail -n +2 | sort -u > ${home}/mixalime/groups/cell.list
-while read cell; do
-    awk -F'\t' -v cell="$cell" 'NR > 1 && $3 == cell { print $7 }' ${home}/clustering/metadata.clustered.tsv \
-        | sort -u \
-        | awk -v home="$home" '{ printf "%s/BADs/%s.with_bad.bed\n", home, $1 }' \
-        > ${home}/mixalime/groups/cell_${cell}.list
-done < ${home}/mixalime/groups/cell.list
-
-
-
 
 
 
@@ -219,6 +260,15 @@ for model in MCNB NB BetaNB;
             ${project}
     done < ${home}/mixalime/groups/cell.list
 done
+
+
+
+
+
+
+
+
+
 
 
 
