@@ -73,9 +73,9 @@ python3 ${scripts}/clustering/clustering.py \
   --king-id ${home}/clustering/king_min100.king.id \
   --meta ${home}/clustering/samples.meta.tsv \
   --out ${home}/clustering/metadata.clustered.tsv \
-  --floor 0.1 \
-  --thr 0.8 \
-  --method average
+  --floor 0.0 \
+  --thr 0.8877 \
+  --method complete
 
 # python3 ${scripts}/clustering/get_pooled_from_geo.py 
 
