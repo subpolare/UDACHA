@@ -116,11 +116,11 @@ done
 
 mkdir -p ${home}/mixalime/file_lists/
 
-find ${home}/BADs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
+find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
     | xargs -0 -I{} bash -c 'n=$(($(wc -l < "$1") - 1)); [ "$n" -gt 500000 ] && basename "$1" .with_bad.bed' _ {} \
     | sort > ${home}/mixalime/file_lists/halfmillions.txt
 
-find ${home}/BADs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
+find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
     | xargs -0 -I{} basename {} .with_bad.bed \
     | sort | grep -Fvx -f ${home}/mixalime/file_lists/halfmillions.txt \
     > ${home}/mixalime/file_lists/not_halfmillions.txt
