@@ -130,11 +130,20 @@ find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
 awk -F '/' '{print $NF}' ${home}/mixalime/file_lists/filtered_list.txt \
     | sed 's/\.with_bad\.bed$//' | sort -u > ${home}/mixalime/file_lists/filtered_indivs.txt
 
-grep -Fxf ${home}/mixalime/file_lists/filtered_indivs.txt ${home}/mixalime/file_lists/halfmillions.txt \
-    | sort -u > ${home}/mixalime/file_lists/halfmillions.filtered.txt
+awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
+  ${home}/mixalime/file_lists/filtered_indivs.txt \
+  ${home}/mixalime/file_lists/halfmillions.txt \
+  > ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
-grep -Fxf ${home}/mixalime/file_lists/filtered_indivs.txt ${home}/mixalime/file_lists/not_halfmillions.txt \
-    | sort -u > ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
+awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
+  ${home}/mixalime/file_lists/filtered_indivs.txt \
+  ${home}/mixalime/file_lists/not_halfmillions.txt \
+  > ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
+
+# wc -l ${home}/mixalime/file_lists/halfmillions.txt
+# wc -l ${home}/mixalime/file_lists/halfmillions.filtered.txt
+# wc -l ${home}/mixalime/file_lists/not_halfmillions.txt
+# wc -l ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
 
 # 4. MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
 
