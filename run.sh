@@ -148,9 +148,9 @@ awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
 # 4. MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
 
 while IFS= read -r indiv_id; do
-    mkdir -p ${home}/mixalime/${indiv_id} 
+    mkdir -p l 
     project=${home}/mixalime/${indiv_id}/${indiv_id}
-    python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BADs/${indiv_id}.with_bad.bed --no-snp-bad-check --max-cover 10000 
+    python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/${indiv_id}.with_bad.bed --no-snp-bad-check --max-cover 10000 
     python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
     python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
     python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
@@ -160,7 +160,7 @@ done < ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
 mkdir -p ${home}/mixalime/less_than_500K_SNPs
 project=${home}/mixalime/less_than_500K_SNPs/less_than_500K_SNPs
-files=$(awk -v home="${home}" '{print home "/BADs/" $0 ".with_bad.bed"}' "${home}/mixalime/file_lists/not_halfmillions.filtered.txt")
+files=$(awk -v home="${home}" '{print home "/BEDs/" $0 ".with_bad.bed"}' "${home}/mixalime/file_lists/not_halfmillions.filtered.txt")
 python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${files} --no-snp-bad-check --max-cover 10000 
 python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
 python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
