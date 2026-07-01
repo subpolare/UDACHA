@@ -252,34 +252,6 @@ done < ${home}/mixalime/groups/factors.list
 
 
 
-for model in MCNB NB BetaNB; 
-    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR TFs > ${home}/logs/status_factors.txt 
-    while read -r tf; do
-        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $tf >> ${home}/logs/status_factors.txt
-        python3 ${scripts}/mixalime/limiter.py --threads $threads combine \
-            --subname TF_${tf} \
-            --group ${home}/mixalime/groups/factors_${tf}.list \
-            ${project}
-    done < ${home}/mixalime/groups/factors.list
-
-    echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START MIXALIME COMBINE FOR CELLS > ${home}/logs/status_cells.txt  
-    while read -r cell; do
-        echo [INFO] $(date '+%Y-%m-%d %H:%M:%S') START $cell >> ${home}/logs/status_cells.txt
-        python3 ${scripts}/mixalime/limiter.py --threads 1 combine \
-            --subname CELL_${cell} \
-            --group ${home}/mixalime/groups/cell_${cell}.list \
-            ${project}
-    done < ${home}/mixalime/groups/cell.list
-done
-
-
-
-
-
-
-
-
-
 
 
 
