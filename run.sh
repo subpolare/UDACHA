@@ -147,8 +147,8 @@ awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
 
 # 4. MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
 
-while IFS= read -r indiv_id; do
-    mkdir -p l 
+while IFS= read -r indiv_id <&3; do
+    mkdir -p ${home}/mixalime/${indiv_id}
     project=${home}/mixalime/${indiv_id}/${indiv_id}
     python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${home}/BEDs/${indiv_id}.with_bad.bed --no-snp-bad-check --max-cover 10000 
     python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
@@ -156,7 +156,7 @@ while IFS= read -r indiv_id; do
     python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
     python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
-done < ${home}/mixalime/file_lists/halfmillions.filtered.txt
+done 3< ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
 mkdir -p ${home}/mixalime/less_than_500K_SNPs
 project=${home}/mixalime/less_than_500K_SNPs/less_than_500K_SNPs
