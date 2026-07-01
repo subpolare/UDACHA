@@ -2,7 +2,7 @@ scripts='/home/subpolare/adastra-v7/scripts'
 home='/sandbox/subpolare/adastra'
 threads=50
 
-mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/ ${home}/mixalime/groups/ ${home}/logs
+mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/ ${home}/mixalime/groups/ ${home}/logs ${home}/mixalime/file_lists/cells_500K/
 if [ ! -d ${home}/hocomoco/v13/pwm ]; then
     set -euo pipefail
     mkdir -p ${home}/hocomoco/v13/pwm
@@ -122,6 +122,10 @@ function num(x){return x~/^[0-9.]+([eE][-+]?[0-9]+)?$/}
 # Find BADs with 500 000 SNPs at least and others
 
 find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
+    | xargs -0 -I{} bash -c 'n=$(($(wc -l < "$1") - 1)); printf "%s\t%s\n" "$(basename "$1" .with_bad.bed)" "$n"' _ {} \
+    | sort > ${home}/mixalime/file_lists/indiv_snps.tsv
+
+find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
     | xargs -0 -I{} bash -c 'n=$(($(wc -l < "$1") - 1)); [ "$n" -gt 500000 ] && basename "$1" .with_bad.bed' _ {} \
     | sort > ${home}/mixalime/file_lists/halfmillions.txt
 
@@ -140,7 +144,41 @@ awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
   ${home}/mixalime/file_lists/not_halfmillions.txt \
   > ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
 
-# MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
+awk -F'\t' '
+NR==FNR{keep[$1];next}
+FNR==1{for(i=1;i<=NF;i++) c[$i]=i; next}
+($c["indiv_id"] in keep){
+    id=$c["indiv_id"]
+    cell=$c["cell_id"]; if(cell==""||cell=="NA") cell=$c["cell"]
+    if(cell!=""&&cell!="NA"&&!seen[id]++) print id,cell
+}' OFS='\t' \
+    ${home}/mixalime/file_lists/not_halfmillions.filtered.txt \
+    ${home}/meta.tsv \
+    | sort \
+    > ${home}/mixalime/file_lists/not_halfmillions.indiv_cell.tsv
+
+awk 'NR==FNR{s[$1]=$2;next}{print $1,$2,s[$1]}' OFS='\t' \
+    ${home}/mixalime/file_lists/indiv_snps.tsv \
+    ${home}/mixalime/file_lists/not_halfmillions.indiv_cell.tsv \
+    > ${home}/mixalime/file_lists/not_halfmillions.indiv_cell_snps.tsv
+
+awk -F'\t' '{s[$2]+=$3} END{for(c in s) if(s[c]>500000) print c}' \
+    ${home}/mixalime/file_lists/not_halfmillions.indiv_cell_snps.tsv \
+    | sort > ${home}/mixalime/file_lists/cells_500K.list
+
+rm -f ${home}/mixalime/file_lists/cells_500K/CELL_*.txt
+rm -f ${home}/mixalime/file_lists/less_than_500K.after_cells.txt
+
+awk -F'\t' -v home="${home}" '
+NR==FNR{big[$1];next}
+{
+    out = ($2 in big) ? home"/mixalime/file_lists/cells_500K/CELL_"$2".txt" : home"/mixalime/file_lists/less_than_500K.after_cells.txt"
+    print $1 >> out
+}' \
+    ${home}/mixalime/file_lists/cells_500K.list \
+    ${home}/mixalime/file_lists/not_halfmillions.indiv_cell_snps.tsv
+
+# MixALiMe without final combine, for all clusters with at least 500 000 SNPs after filtration
 
 rm -rf ${home}/mixalime/INDIV_???? ${home}/mixalime/less_than_500K_SNPs
 
@@ -160,13 +198,38 @@ python3 ${scripts}/mixalime/indivs_sclices.py \
     --meta ${home}/meta.tsv \
     --cells-meta /home/subpolare/adastra-v7/meta/meta_cells_and_tissues.tsv
 
+# MixALiMe without final combine, for all cell types with at least 500 000 SNPs for all clusters in this cell type
+
+while IFS= read -r cell_id <&3; do
+    list=${home}/mixalime/file_lists/cells_500K/CELL_${cell_id}.txt
+    if [ ! -s "$list" ]; then
+        continue
+    fi
+
+    mkdir -p ${home}/mixalime/CELL_${cell_id}
+    project=${home}/mixalime/CELL_${cell_id}/CELL_${cell_id}
+    mapfile -t files < <(
+        awk -v home="${home}" '{print home "/BEDs/" $0 ".with_bad.bed"}' "$list"
+    )
+
+    if [ "${#files[@]}" -gt 0 ]; then
+        python3 ${scripts}/mixalime/limiter.py --threads $threads create $project "${files[@]}" --no-snp-bad-check --max-cover 10000 
+        python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
+        python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
+        python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
+        python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
+        python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
+    fi
+done 3< ${home}/mixalime/file_lists/cells_500K.list
+
+# MixALiMe without final combine, for other clusters
+
 mkdir -p ${home}/mixalime/less_than_500K_SNPs
 project=${home}/mixalime/less_than_500K_SNPs/less_than_500K_SNPs
 mapfile -t files < <(
     awk -v home="${home}" '{print home "/BEDs/" $0 ".with_bad.bed"}' \
-        ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
+        ${home}/mixalime/file_lists/less_than_500K.after_cells.txt
 )
-
 if [ "${#files[@]}" -gt 0 ]; then
     python3 ${scripts}/mixalime/limiter.py --threads $threads create $project "${files[@]}" --no-snp-bad-check --max-cover 10000 
     python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
