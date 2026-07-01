@@ -147,6 +147,9 @@ awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
 
 # 4. MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
 
+unset XLA_PYTHON_CLIENT_ALLOCATOR
+export JAX_PLATFORMS=cpu
+
 while IFS= read -r indiv_id <&3; do
     mkdir -p ${home}/mixalime/${indiv_id}
     project=${home}/mixalime/${indiv_id}/${indiv_id}
