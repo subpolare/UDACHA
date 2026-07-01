@@ -1,7 +1,6 @@
-home='/sandbox/subpolare/adastra'
 scripts='/home/subpolare/adastra-v7/scripts'
-mixalime_model='NB'
-threads=100
+home='/sandbox/subpolare/adastra'
+threads=50
 
 # DO NOT EDIT BELOW
 
@@ -77,8 +76,6 @@ python3 ${scripts}/clustering/clustering.py \
   --thr 0.8877 \
   --method complete
 
-# python3 ${scripts}/clustering/get_pooled_from_geo.py 
-
 # python3 ${scripts}/clustering/split_into_pooled.py \
 #     --input-tsv ${home}clustering/metadata.clustered.with_gse.tsv \
 #     --output-not-pooled-tsv ${home}/clustering/metadata.clustered.not_pooled.tsv \
@@ -115,6 +112,24 @@ done
 # Find BADs with 500 000 SNPs at least and others 
 
 mkdir -p ${home}/mixalime/file_lists/
+python3 ${scripts}/clustering/get_pooled_from_geo.py 
+python3 ${scripts}/meta/join_meta.py \
+    --meta6 ~/adastra-v7/meta/meta_6_may.tsv \
+    --qc ~/adastra-v7/meta/full_qc_table.tsv \
+    --clustered ${home}/clustering/GEO/metadata.clustered.pooled.tsv \
+    --out ${home}/meta.tsv
+
+awk -F'\t' '
+NR==1 {for(i=1;i<=NF;i++) c[$i]=i; next}
+function num(x){return x~/^[0-9.]+([eE][-+]?[0-9]+)?$/}
+{
+    id=$c["indiv_id"]; if(id=="" || id=="NA") next
+    base=id; sub(/__CELL.*/,"",base)
+    p=tolower($c["pooled"]); n=$c["NRF"]; r=$c["reads_num"]
+
+    if (p=="true" || (num(n) && n<0.05) || (num(n) && num(r) && n<0.4 && r>0.75e9)) print base
+}
+' ${home}/meta.tsv | sort -u > ${home}/mixalime/file_lists/filtered_list.txt
 
 find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
     | xargs -0 -I{} bash -c 'n=$(($(wc -l < "$1") - 1)); [ "$n" -gt 500000 ] && basename "$1" .with_bad.bed' _ {} \
@@ -125,30 +140,19 @@ find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
     | sort | grep -Fvx -f ${home}/mixalime/file_lists/halfmillions.txt \
     > ${home}/mixalime/file_lists/not_halfmillions.txt
 
-# filtered_list.txt is the list of files after filtration, format of exh string is /sandbox/subpolare/adastra/BADs_geometric_p0_99/INDIV_*.with_bad.bed 
-# (where /sandbox/subpolare/adastra/ is $home)
-awk -F '/' '{print $NF}' ${home}/mixalime/file_lists/filtered_list.txt \
-    | sed 's/\.with_bad\.bed$//' | sort -u > ${home}/mixalime/file_lists/filtered_indivs.txt
-
 awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
-  ${home}/mixalime/file_lists/filtered_indivs.txt \
+  ${home}/mixalime/file_lists/filtered_list.txt \
   ${home}/mixalime/file_lists/halfmillions.txt \
   > ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
 awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
-  ${home}/mixalime/file_lists/filtered_indivs.txt \
+  ${home}/mixalime/file_lists/filtered_list.txt \
   ${home}/mixalime/file_lists/not_halfmillions.txt \
   > ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
 
-# wc -l ${home}/mixalime/file_lists/halfmillions.txt
-# wc -l ${home}/mixalime/file_lists/halfmillions.filtered.txt
-# wc -l ${home}/mixalime/file_lists/not_halfmillions.txt
-# wc -l ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
-
 # 4. MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
 
-unset XLA_PYTHON_CLIENT_ALLOCATOR
-export JAX_PLATFORMS=cpu
+rm -rf ${home}/mixalime/INDIV_???? ${home}/mixalime/less_than_500K_SNPs
 
 while IFS= read -r indiv_id <&3; do
     mkdir -p ${home}/mixalime/${indiv_id}
@@ -163,24 +167,19 @@ done 3< ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
 mkdir -p ${home}/mixalime/less_than_500K_SNPs
 project=${home}/mixalime/less_than_500K_SNPs/less_than_500K_SNPs
-files=$(awk -v home="${home}" '{print home "/BEDs/" $0 ".with_bad.bed"}' "${home}/mixalime/file_lists/not_halfmillions.filtered.txt")
-python3 ${scripts}/mixalime/limiter.py --threads $threads create $project ${files} --no-snp-bad-check --max-cover 10000 
-python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
-python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
-python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
-python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
-python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
+mapfile -t files < <(
+    awk -v home="${home}" '{print home "/BEDs/" $0 ".with_bad.bed"}' \
+        ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
+)
 
-# for pooled samples. But in new version we manually remove them before MixALiMe 
-# mkdir -p ${home}/mixalime/pooled
-# project=${home}/mixalime/pooled/pooled
-# awk -F'\t' 'NR==1 {for (i=1; i<=NF; i++) {if ($i=="indiv_id") c1=i; if ($i=="pooled") c2=i} next} $c2=="True" {print "/sandbox/subpolare/adastra/BADs/" $c1 ".with_bad.bed"}
-# ' /sandbox/subpolare/adastra/clustering/GEO/metadata.clustered.pooled.tsv | sort -u | xargs python3 ${scripts}/mixalime/limiter.py --threads $threads create $project --no-snp-bad-check --max-cover 10000 
-# python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project BetaNB
-# python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
-# python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
-# python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
-# python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
+if [ "${#files[@]}" -gt 0 ]; then
+    python3 ${scripts}/mixalime/limiter.py --threads $threads create $project "${files[@]}" --no-snp-bad-check --max-cover 10000 
+    python3 ${scripts}/mixalime/limiter.py --threads $threads fit $project NB
+    python3 ${scripts}/mixalime/limiter.py --threads $threads test $project
+    python3 ${scripts}/mixalime/limiter.py --threads $threads combine $project
+    python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
+    python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
+fi
 
 # Prepare list of foles with different TFs and cell lines for MixALiMe combine 
 
