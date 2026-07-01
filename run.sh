@@ -155,6 +155,11 @@ while IFS= read -r indiv_id <&3; do
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
 done 3< ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
+python3 ${scripts}/mixalime/indivs_sclices.py \
+    --home ${home} \
+    --meta ${home}/meta.tsv \
+    --cells-meta /home/subpolare/adastra-v7/meta/meta_cells_and_tissues.tsv
+
 mkdir -p ${home}/mixalime/less_than_500K_SNPs
 project=${home}/mixalime/less_than_500K_SNPs/less_than_500K_SNPs
 mapfile -t files < <(
@@ -170,6 +175,7 @@ if [ "${#files[@]}" -gt 0 ]; then
     python3 ${scripts}/mixalime/limiter.py --threads $threads export all $project $project
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
 fi
+python3 ${scripts}/mixalime/lessthan500k_sclices.py --home ${home}
 
 # Prepare list of files with different TFs and cell lines for MixALiMe combine 
 
