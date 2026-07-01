@@ -2,8 +2,6 @@ scripts='/home/subpolare/adastra-v7/scripts'
 home='/sandbox/subpolare/adastra'
 threads=50
 
-# DO NOT EDIT BELOW
-
 mkdir -p ${home}/VCFs/ ${home}/BEDs/ ${home}/clustering ${home}/BADs/ ${home}/SNPs/ ${home}/SNPScan/ ${home}/mixalime/ ${home}/mixalime/groups/ ${home}/logs
 if [ ! -d ${home}/hocomoco/v13/pwm ]; then
     set -euo pipefail
@@ -12,7 +10,7 @@ if [ ! -d ${home}/hocomoco/v13/pwm ]; then
         | tar -xz -C ${home}/hocomoco/v13/pwm --strip-components=2
 fi
 
-# 1. Merging files 
+# Merging files 
 
 python3 ${scripts}/clustering/renamer.py 
 for file in ${home}/VCFs/*.vcf.gz; do
@@ -46,25 +44,20 @@ find ${home}/VCFs -maxdepth 1 -type f -name "*.without_MAF.vcf.gz" ! -name "merg
       ' _ \
     | LC_ALL=C sort -u > ${home}/clustering/merged.min100.list
 
-bcftools merge -l ${home}/clustering/merged.min100.list \   # leave samples with at least 100 SNPs 
-    --missing-to-ref \                                      # because plink2 does not work with ./. in VCF
+bcftools merge -l ${home}/clustering/merged.min100.list \
+    --missing-to-ref \
     -Oz -o ${home}/VCFs/merged.min100.vcf.gz \ 
     --threads $threads \
     -m none 
 
-# If there is an duplicate error in bcftools merge, use command below to find duplicates: 
-# for f in ${home}/VCFs/*.without_MAF.vcf.gz; do bcftools query -l "$f"; done | sort | uniq -d
-# of all the duplicates, only one should be left 
-
 bcftools index --threads $threads -f ${home}/VCFs/merged.min100.vcf.gz
 
-# 2. Clustering using PLINK2 and ... 
+# 2. Hierarchical clustering using PLINK2 data 
 
 plink2 --vcf ${home}/VCFs/merged.min100.vcf.gz \
   --allow-extra-chr \
   --threads $threads \
-  --make-king square \    # for main pipeline
-  # --make-king-table \   # for debugging and results analyzing
+  --make-king square \
   --out ${home}/clustering/king_min100
 
 python3 ${scripts}/clustering/clustering.py \
@@ -75,11 +68,6 @@ python3 ${scripts}/clustering/clustering.py \
   --floor 0.0 \
   --thr 0.8877 \
   --method complete
-
-# python3 ${scripts}/clustering/split_into_pooled.py \
-#     --input-tsv ${home}clustering/metadata.clustered.with_gse.tsv \
-#     --output-not-pooled-tsv ${home}/clustering/metadata.clustered.not_pooled.tsv \
-#     --output-pooled-tsv ${home}/clustering/metadata.clustered.pooled.tsv
 
 python3 ${scripts}/clustering/create_bed_clusters.py \
   --metadata ${home}/clustering/metadata.clustered.tsv \
@@ -93,7 +81,7 @@ find ${home}/BEDs -type f -name '*.bed' -exec sh -c '
   done
 ' sh {} +
 
-# 3. BABACHI, https://github.com/autosome-ru/BABACHI 
+# BABACHI, https://github.com/autosome-ru/BABACHI 
 
 find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.bed' -print0 | while IFS= read -r -d '' file; do
     name=$(basename $file .bed)
@@ -109,7 +97,7 @@ find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.bed' -print0 | while IFS= read -r -
         --output ${home}/BEDs/${name}.with_bad.bed
 done 
 
-# Find BADs with 500 000 SNPs at least and others 
+# Filtration based on pooled samples, GSE and reads number
 
 mkdir -p ${home}/mixalime/file_lists/
 python3 ${scripts}/clustering/get_pooled_from_geo.py 
@@ -131,6 +119,8 @@ function num(x){return x~/^[0-9.]+([eE][-+]?[0-9]+)?$/}
 }
 ' ${home}/meta.tsv | sort -u > ${home}/mixalime/file_lists/filtered_list.txt
 
+# Find BADs with 500 000 SNPs at least and others
+
 find ${home}/BEDs -maxdepth 1 -name 'INDIV_*.with_bad.bed' -print0 \
     | xargs -0 -I{} bash -c 'n=$(($(wc -l < "$1") - 1)); [ "$n" -gt 500000 ] && basename "$1" .with_bad.bed' _ {} \
     | sort > ${home}/mixalime/file_lists/halfmillions.txt
@@ -150,7 +140,7 @@ awk 'NR==FNR{bad[$1];next}{x=$1;sub(/__CELL.*/,"",x)}!(x in bad)&&!seen[$1]++' \
   ${home}/mixalime/file_lists/not_halfmillions.txt \
   > ${home}/mixalime/file_lists/not_halfmillions.filtered.txt
 
-# 4. MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
+# MixALiMe without final combine, http://mixalime.georgy.top/tutorial/quickstart.html 
 
 rm -rf ${home}/mixalime/INDIV_???? ${home}/mixalime/less_than_500K_SNPs
 
@@ -181,7 +171,7 @@ if [ "${#files[@]}" -gt 0 ]; then
     python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
 fi
 
-# Prepare list of foles with different TFs and cell lines for MixALiMe combine 
+# Prepare list of files with different TFs and cell lines for MixALiMe combine 
 
 filtered="${home}/mixalime/file_lists/filtered_list.txt"
 filtered_names="${home}/mixalime/file_lists/filtered_names.txt"
@@ -205,7 +195,7 @@ while read -r cell; do
         > "${home}/mixalime/groups/cell_${cell}.list"
 done < "${home}/mixalime/groups/cell.list"
 
-# 4. MixALiMe combine
+# MixALiMe combine
 
 mkdir -p ${home}/mixalime/multiple_combine
 
