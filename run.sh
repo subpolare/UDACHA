@@ -194,8 +194,7 @@ while IFS= read -r indiv_id <&3; do
 done 3< ${home}/mixalime/file_lists/halfmillions.filtered.txt
 
 python3 ${scripts}/mixalime/indivs_sclices.py \
-    --home ${home} \
-    --meta ${home}/meta.tsv \
+    --home ${home} --meta ${home}/meta.tsv \
     --cells-meta /home/subpolare/adastra-v7/meta/meta_cells_and_tissues.tsv
 
 # MixALiMe without final combine, for all cell types with at least 500 000 SNPs for all clusters in this cell type
@@ -221,6 +220,8 @@ while IFS= read -r cell_id <&3; do
         python3 ${scripts}/mixalime/limiter.py --threads $threads plot all $project $project
     fi
 done 3< ${home}/mixalime/file_lists/cells_500K.list
+python3 ${scripts}/mixalime/cells_sclices.py --home ${home} \
+    --cells-meta /home/subpolare/adastra-v7/meta/meta_cells_and_tissues.tsv
 
 # MixALiMe without final combine, for other clusters
 
