@@ -251,7 +251,7 @@ cut -f2 "${home}/clustering/metadata.clustered.tsv" | tail -n +2 | sort -u > "${
 while read -r tf; do
     awk -F'\t' -v tf="$tf" 'NR > 1 && $2 == tf { print $7 }' "${home}/clustering/metadata.clustered.tsv" \
         | sort -u \
-        | awk -v home="$home" '{ printf "%s/BADs/%s.with_bad.bed\t%s.with_bad.bed\n", home, $1, $1 }' \
+        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\t%s.with_bad.bed\n", home, $1, $1 }' \
         | awk -F'\t' 'NR==FNR { ok[$1]=1; next } $2 in ok { print $1 }' "$filtered_names" - \
         > "${home}/mixalime/groups/factors_${tf}.list"
 done < "${home}/mixalime/groups/factors.list"
@@ -260,7 +260,7 @@ cut -f3 "${home}/clustering/metadata.clustered.tsv" | tail -n +2 | sort -u > "${
 while read -r cell; do
     awk -F'\t' -v cell="$cell" 'NR > 1 && $3 == cell { print $7 }' "${home}/clustering/metadata.clustered.tsv" \
         | sort -u \
-        | awk -v home="$home" '{ printf "%s/BADs/%s.with_bad.bed\t%s.with_bad.bed\n", home, $1, $1 }' \
+        | awk -v home="$home" '{ printf "%s/BEDs/%s.with_bad.bed\t%s.with_bad.bed\n", home, $1, $1 }' \
         | awk -F'\t' 'NR==FNR { ok[$1]=1; next } $2 in ok { print $1 }' "$filtered_names" - \
         > "${home}/mixalime/groups/cell_${cell}.list"
 done < "${home}/mixalime/groups/cell.list"
