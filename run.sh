@@ -243,7 +243,7 @@ python3 ${scripts}/mixalime/lessthan500k_sclices.py --home ${home}
 
 # Prepare list of files with different TFs and cell lines for MixALiMe combine 
 
-filtered="${home}/mixalime/file_lists/filtered_list.txt"
+filtered="${home}/mixalime/file_lists/filtered_indivs.txt"
 filtered_names="${home}/mixalime/file_lists/filtered_names.txt"
 
 awk -F/ '{print $NF}' "$filtered" | sort -u > "$filtered_names"
